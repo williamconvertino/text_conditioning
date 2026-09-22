@@ -1,0 +1,24 @@
+# Final conditioning evaluation settings (README "Final Conditioning
+# Evaluation"). block_size / meco_max_tokens / encoder_max_tokens are filled in
+# from the run's own resolved_config.yaml by scripts/evaluate.py if not set here.
+
+# "overall" scope: the fixed, domain-independent validation sample (same one
+# training-time validation uses).
+val_docs: 2000
+val_batch_size: 16
+
+# "top_domains" scope (src/eval/domain_support.py, src/eval/conditioning.py):
+# FineWeb's domain distribution is extremely long-tailed -- most domains have
+# only 1-2 documents even across a full ~47k-document validation shard -- so
+# same-domain/domain-mean conditioning is restricted to the n_domains domains
+# with the most validation documents, guaranteeing each one can support a
+# domain_support_k-document support split. domain_scan_docs bounds how many
+# validation documents are scanned to *find* those domains (null = the entire
+# validation shard; this is a cheap Python-side histogram, not a model forward
+# pass, so leaving it unbounded is fine even for large validation sets).
+n_domains: 50
+domain_scan_docs: null
+domain_support_k: 8        # K support docs per domain for same-domain / domain-mean conditioning
+min_docs_per_domain: 2     # a domain needs >= min_docs_per_domain + domain_support_k docs to be selected
+cross_domain: true         # optional cheap sanity check (README "Optional: Cross-Domain Conditioning")
+seed: 1234

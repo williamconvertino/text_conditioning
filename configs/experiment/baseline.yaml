@@ -1,0 +1,6 @@
+# Experiment A -- Baseline: standard Llama-style causal LM, no conditioning.
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: baseline
+variant: none

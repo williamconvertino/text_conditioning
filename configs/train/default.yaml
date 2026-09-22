@@ -1,0 +1,34 @@
+# Data, optimization, and logging defaults shared by every experiment. An
+# experiment config includes this file and overrides only what it needs to
+# (e.g. conditioning_schedule is set in the experiment yaml, not here).
+
+# data
+tok_dir: ./data/fineweb_tokenized/100BT
+tokenizer: meta-llama/Llama-3.2-3B
+n_val_shards: 1
+val_docs: 2000
+val_batch_size: 16
+block_size: 2048
+meco_max_tokens: 48       # cap on tokenized domain-string prefix length (MeCo)
+encoder_max_tokens: 512   # cap on tokens the text encoder sees per document
+
+# optimization
+local_batch: 16
+grad_accum: 8
+lr: 3.0e-4
+min_lr: 3.0e-5
+warmup_steps: 1000
+max_steps: 20000
+weight_decay: 0.1
+grad_clip: 1.0
+seed: 1234
+dtype: bfloat16
+
+# cadence
+log_interval: 20
+val_interval: 500          # also the ckpt_last.pt (resume) save cadence -- see src/training/trainer.py
+ckpt_save_interval_tokens: 250000000  # standing eval snapshot (outputs/<run>/checkpoints/) every ~250M
+                                       # tokens actually consumed -- ~954 steps at this file's
+                                       # local_batch/grad_accum/block_size on 1 GPU (scales down with
+                                       # world_size, since tokens_seen already accounts for it)
+no_resume: false

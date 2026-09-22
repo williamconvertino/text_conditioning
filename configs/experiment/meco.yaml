@@ -1,0 +1,7 @@
+# Experiment B -- MeCo: same backbone as baseline.yaml, with a URL/domain string
+# prepended as ordinary tokens (src/data/collator.py, variant "meco").
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: meco
+variant: meco

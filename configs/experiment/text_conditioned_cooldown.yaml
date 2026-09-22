@@ -1,0 +1,18 @@
+# Experiment E -- Conditioning Schedule: same architecture as text_conditioned.yaml,
+# but the conditioning probability is held at 1.0 for the first 70% of training
+# and linearly cooled to 0.0 by the end, so the backbone is pushed to retain
+# text-conditioning's benefit even once conditioning is removed (README
+# "Experiment E: Conditioning Schedule"). Swap `kind` for cosine_cooldown /
+# step_cooldown to try the other schedules in src/training/schedules.py.
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: text_conditioned_cooldown
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+conditioning_schedule:
+  kind: linear_cooldown
+  p_start: 0.90
+  p_end: 0.10
+  cooldown_start_frac: 0.7
+  cooldown_end_frac: 1.0

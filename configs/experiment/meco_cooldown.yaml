@@ -1,0 +1,22 @@
+# Experiment B' -- MeCo Conditioning Schedule: same as meco.yaml, but the
+# domain prefix is held on the whole document 100% of the time for the first
+# 70% of training, then linearly cooled to 0% by the end, so the backbone is
+# pushed to retain MeCo's benefit even once the domain prefix is removed at
+# inference time (mirrors text_conditioned_cooldown.yaml's Experiment E,
+# see README "Experiment E: Conditioning Schedule"). Swap `kind` for
+# cosine_cooldown / step_cooldown to try the other schedules in
+# src/training/schedules.py. Unlike the "text" variant's schedule (a null
+# *vector* substituted post-hoc), dropping MeCo's conditioning means dropping
+# the domain-prefix tokens themselves at batch-construction time -- see
+# src/data/collator.py's collate_lm_batch keep_mask.
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: meco_cooldown
+variant: meco
+conditioning_schedule:
+  kind: linear_cooldown
+  p_start: 1.0
+  p_end: 0.0
+  cooldown_start_frac: 0.7
+  cooldown_end_frac: 1.0

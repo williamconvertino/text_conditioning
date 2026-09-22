@@ -1,0 +1,11 @@
+wac20    1031393  0.0  0.0   5532  3800 pts/2    S+   Sep17   0:00 tmux new -s claude
+wac20    1031395  0.3  0.0   6352  3920 ?        Ss   Sep17   4:26 tmux new -s claude
+wac20    1213323  0.1  0.0 5633400 169148 ?      Ssl  Sep17   1:34 /hpc/home/wac20/.local/bin/claude daemon run --json-path /hpc/home/wac20/.claude/daemon.json --log-file /hpc/home/wac20/.claude/daemon.log --origin transient --spawned-by {"label":"claude","cwd":"/work/wac20/ctrl_tokens/text_conditioned","pid":1039269}
+wac20    1213364  0.0  0.0 5569804 107056 ?      SNsl Sep17   0:13 claude bg-pty-host --bg-pty-host /tmp/cc-daemon-1382647/677dcbf0/spare/047b6f6c.pty.sock 200 50 -- /work/wac20/.local/share/claude/versions/2.1.276 --bg-spare /tmp/cc-daemon-1382647/677dcbf0/spare/047b6f6c.claim.sock
+wac20    1213374  0.0  0.0 5631868 353668 pts/7  SNsl+ Sep17   0:20 claude bg-spare --bg-spare /tmp/cc-daemon-1382647/677dcbf0/spare/047b6f6c.claim.sock
+jl1401   1493862  2.0  0.0 73809636 468496 pts/47 Sl+ 09:55   3:02 claude
+jl1401   1545159  0.0  0.0   7412  3732 ?        Ss   11:49   0:00 /bin/bash -c source /hpc/home/jl1401/.claude/shell-snapshots/snapshot-bash-1789739774621-z0czfl.sh 2>/dev/null || true && shopt -u extglob 2>/dev/null || true && eval 'until [ -f /work/jl1401/MedGRM/data/medmcqa_grm_pointwise_v2/test.parquet ]; do sleep 600; done; echo "test.parquet ready"; DATASET_PREFIX=ultramed TEST_PARQUET=/work/jl1401/MedGRM/data/medmcqa_grm_pointwise_v2/test.parquet sbatch /work/jl1401/MedGRM/scripts/eval_grm_pointwise.sh 500 4 1.0 current' < /dev/null && pwd -P >| /tmp/claude-c377-cwd
+wac20    1551062  0.0  0.0   5532  4032 pts/4    S+   12:17   0:00 tmux attach -t claude
+wac20    1552335  0.2  0.0 5569804 103128 ?      SNsl 12:20   0:00 claude bg-pty-host --bg-pty-host /tmp/cc-daemon-1382647/677dcbf0/spare/d8eb4adc.pty.sock 200 50 -- /work/wac20/.local/share/claude/versions/2.1.276 --bg-spare /tmp/cc-daemon-1382647/677dcbf0/spare/d8eb4adc.claim.sock
+wac20    1552357  0.3  0.0 5569784 150084 ?      SNl  12:20   0:00 claude bg-spare --bg-spare /tmp/cc-daemon-1382647/677dcbf0/spare/d8eb4adc.claim.sock
+wac20    1553609  0.0  0.0   6432  2536 pts/3    S+   12:22   0:00 grep --color=auto claude

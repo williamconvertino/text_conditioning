@@ -1,0 +1,13 @@
+# Experiment D -- Total-Parameter-Matched Text Conditioning: the causal backbone
+# is shrunk (llama_medium_param_matched.yaml) so that backbone + encoder params
+# stay close to the baseline's backbone-only param count. Verify with
+# scripts/count_params.py -- see that config file's comment.
+include:
+  - ../model/llama_medium_param_matched.yaml
+  - ../train/default.yaml
+name: text_conditioned_param_matched
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+conditioning_schedule:
+  kind: constant
+  p_condition: 0.90

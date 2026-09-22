@@ -1,0 +1,10 @@
+torch>=2.4
+transformers>=5.0
+huggingface_hub>=0.24
+numpy
+pandas
+pyarrow
+pyyaml
+matplotlib
+pytest
+lm-eval>=0.4

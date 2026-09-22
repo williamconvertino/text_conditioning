@@ -1,0 +1,28 @@
+# Default lm-evaluation-harness benchmark suite
+# (scripts/benchmarks/run_benchmarks.py / src/benchmarks/lm_wrapper.py).
+#
+# Every task here is loglikelihood-only multiple-choice/binary accuracy: no
+# free-form generation (this project's causal LM has no generate()/KV-cache
+# implementation -- see src/models/modeling_llama.py) and no perplexity-style
+# scoring (README "Evaluation": val loss/ppl is already tracked throughout
+# training by src/eval/perplexity.py; downstream task accuracy is meant to add
+# a complementary signal, not duplicate that). This keeps every task cheap
+# enough to run for every (run, conditioning) combination -- see
+# src/benchmarks/conditioning.py / configs/benchmarks/sources.yaml for the
+# conditioning axis this gets crossed with.
+tasks:
+  - hellaswag
+  - piqa
+  - arc_easy
+  - arc_challenge
+  - winogrande
+  - boolq
+  - openbookqa
+  - lambada_openai
+
+num_fewshot: 0
+batch_size: 16
+
+# Docs per task; null runs the full validation/test split. Set to e.g. 200 for
+# a fast smoke test across every task before committing to a full run.
+limit: null

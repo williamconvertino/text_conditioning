@@ -1,0 +1,23 @@
+# Experiment D (README "Total-Parameter-Matched Text Conditioning"): the causal
+# backbone is shrunk slightly so that backbone + encoder params stay close to
+# llama_small.yaml's backbone-only param count. num_hidden_layers is dropped
+# 12 -> 11 as a starting point; verify the actual match with:
+#   python scripts/count_params.py configs/experiment/baseline.yaml \
+#       configs/experiment/text_conditioned_param_matched.yaml
+# and adjust num_hidden_layers/hidden_size here until the two totals are close
+# (exact equality is not required -- see README).
+#
+# No longer the default for text_conditioned_param_matched.yaml --
+# llama_medium_param_matched.yaml is -- but kept around to pair with
+# llama_small.yaml for quick smoke tests.
+model_size: small
+hidden_size: 768
+intermediate_size: 2048
+num_hidden_layers: 11
+num_attention_heads: 12
+num_key_value_heads: 4
+max_position_embeddings: 2049
+rms_norm_eps: 1.0e-5
+rope_theta: 500000.0
+initializer_range: 0.02
+tie_word_embeddings: true

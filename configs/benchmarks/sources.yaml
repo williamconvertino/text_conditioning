@@ -1,0 +1,36 @@
+# Named URL/domain "sources" for conditioning experiments during benchmarking
+# (src/benchmarks/sources.py, src/benchmarks/conditioning.py):
+#
+#   meco_domain: the exact domain string prepended as MeCo's URL/domain
+#     metadata prefix, exactly as it would appear during training -- i.e.
+#     url_to_domain(doc_url) for a real document from this source (see
+#     src/data/metadata.py). Used by `--mode meco --source <name>`.
+#
+#   match: substrings tested against url_to_domain(doc_url) to select
+#     *training*-shard documents belonging to this source. Used by
+#     `--mode text --source <name>` to build a domain-mean conditioning
+#     vector: n_docs_per_source matching documents are drawn from the
+#     training shards, encoded, and averaged (src/benchmarks/conditioning.py).
+#
+# Both --mode meco and --mode text also accept an ad hoc --domain / --url
+# instead of --source, for one-off experimentation beyond this list (see
+# scripts/benchmarks/run_benchmarks.py --help).
+sources:
+  wikipedia:
+    meco_domain: en.wikipedia.org
+    match: [wikipedia.org]
+  reddit:
+    meco_domain: reddit.com
+    match: [reddit.com]
+  stackexchange:
+    meco_domain: stackoverflow.com
+    match: [stackoverflow.com, stackexchange.com]
+  news:
+    meco_domain: nytimes.com
+    match: [nytimes.com, bbc.co.uk, bbc.com, theguardian.com, cnn.com, reuters.com]
+  github:
+    meco_domain: github.com
+    match: [github.com]
+
+n_docs_per_source: 20   # K training documents averaged into a source's text-conditioning vector
+seed: 1234

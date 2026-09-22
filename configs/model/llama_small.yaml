@@ -1,0 +1,23 @@
+# Smallest backbone (~170M params), fast to train and easy to interpret, per
+# README "Initial Experiments" / "Scope of the Initial Project". No longer the
+# default for the initial experiment configs -- llama_medium.yaml (~400M) is --
+# but kept around for quick smoke tests or if a faster iteration loop is
+# needed. Swap in llama3_3b.yaml (or scale these numbers up) for the full-scale
+# run once results look promising and a larger compute budget is available.
+#
+# `model_size` is not read by the model itself -- scripts/train.py appends it
+# to the run's output directory name (outputs/<experiment>_<model_size>) so
+# that switching an experiment's `include:` to a different model config
+# starts a fresh run dir instead of overwriting/resuming this one's
+# checkpoints and logs.
+model_size: small
+hidden_size: 768
+intermediate_size: 2048
+num_hidden_layers: 12
+num_attention_heads: 12
+num_key_value_heads: 4
+max_position_embeddings: 2049   # block_size (2048) + 1, for the conditioning position
+rms_norm_eps: 1.0e-5
+rope_theta: 500000.0
+initializer_range: 0.02
+tie_word_embeddings: true

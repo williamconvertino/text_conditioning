@@ -1,0 +1,13 @@
+# Experiment C -- Learned Text Conditioning: same backbone as baseline.yaml plus
+# a small bidirectional encoder producing a single conditioning vector z,
+# prepended in embedding space (src/models/conditioned_lm.py). Constant 0.90
+# conditioning probability during training -- see README "Unconditioned Mode".
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: text_conditioned
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+conditioning_schedule:
+  kind: constant
+  p_condition: 0.90
