@@ -1,7 +1,19 @@
 # Experiment B -- MeCo: same backbone as baseline.yaml, with a URL/domain string
 # prepended as ordinary tokens (src/data/collator.py, variant "meco").
+#
+# Constant 0.90 conditioning probability during training, aligned with
+# text_conditioned.yaml / text_conditioned_url.yaml: a dropped example has its
+# domain-prefix tokens removed at collation time (src/data/collator.py's
+# collate_lm_batch keep_mask), so MeCo's unconditioned mode is actually trained
+# (README "Unconditioned Mode"). The original MeCo recipe is p_condition 1.0 --
+# outputs/checkpoints/meco_medium was trained that way, before this schedule was set here;
+# slurm/experiments/train_meco.slurm passes --p-condition 0.9 so the 0.9 run
+# gets its own dir (outputs/checkpoints/meco_p0.9_medium) instead of resuming that one.
 include:
   - ../model/llama_medium.yaml
   - ../train/default.yaml
 name: meco
 variant: meco
+conditioning_schedule:
+  kind: constant
+  p_condition: 0.90

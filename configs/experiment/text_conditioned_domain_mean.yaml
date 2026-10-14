@@ -1,0 +1,29 @@
+# Experiment F -- Domain-Mean Conditioning: same architecture as
+# text_conditioned.yaml, but a document is never conditioned on its own
+# encoding. The encoder instead sees up to n_support *other* training
+# documents from the same URL domain and their encodings are averaged --
+# i.e. training uses the same condition as the final eval's "Domain-Mean" mode
+# (README "Domain-Conditioned Training", src/data/domain_index.py).
+#
+# A document whose domain has no other document in the training split (or
+# whose URL has no parseable domain) gets the null vector, the same default
+# conditioning a schedule-dropped example gets. conditioning_schedule works
+# exactly as for self-conditioning: with probability 1 - p_condition a
+# document gets the null vector even when it has in-domain partners.
+#
+# Needs the training-split domain index first:
+#   sbatch slurm/domain_conditioned/build_domain_index.slurm
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: text_conditioned_domain_mean
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+text_conditioning_source: domain_mean   # self | domain_random | domain_mean
+domain_conditioning:
+  index_dir: ./data/domain_index/100BT   # scripts/build_domain_index.py output
+  n_support: 8          # other in-domain docs averaged per example (matches eval's domain_support_k)
+  min_domain_docs: 2    # a domain needs >= this many docs (target included) to be used
+conditioning_schedule:
+  kind: constant
+  p_condition: 0.90

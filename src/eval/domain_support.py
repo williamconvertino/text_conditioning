@@ -25,7 +25,7 @@ import random
 
 import torch
 
-from src.data.collator import collate_encoder_batch, doc_dict
+from src.data.collator import collate_encoder_batch, collate_partner_encoder_batch, doc_dict
 from src.data.metadata import url_to_domain
 from src.data.shards import iter_shard_docs
 
@@ -103,6 +103,17 @@ def encode_single_doc(conditioner, tokenizer, shard, row, encoder_max_tokens, de
     z = conditioner.encoder(input_ids=enc["input_ids"].to(device),
                             attention_mask=enc["attention_mask"].to(device))
     return z[0]
+
+
+@torch.no_grad()
+def encode_condition_lists(conditioner, tokenizer, input_lists, encoder_max_tokens, device):
+    """input_lists: one list of encoder inputs per row (e.g.
+    src/data/url_conditioning.py's UrlConditionSource.for_url) -> [B, H]: the
+    mean encoding of each row's inputs, or the null vector for an empty list
+    -- the same computation training uses for condition-source batches."""
+    enc = collate_partner_encoder_batch(input_lists, tokenizer, encoder_max_tokens)
+    return conditioner(enc["input_ids"].to(device), enc["attention_mask"].to(device),
+                       group_index=enc["group_index"], has_condition=enc["has_condition"])
 
 
 def save_support_cache(path, support_vectors):

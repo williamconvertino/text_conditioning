@@ -27,7 +27,7 @@ dtype: bfloat16
 # cadence
 log_interval: 20
 val_interval: 500          # also the ckpt_last.pt (resume) save cadence -- see src/training/trainer.py
-ckpt_save_interval_tokens: 250000000  # standing eval snapshot (outputs/<run>/checkpoints/) every ~250M
+ckpt_save_interval_tokens: 250000000  # standing eval snapshot (outputs/checkpoints/<run>/checkpoints/) every ~250M
                                        # tokens actually consumed -- ~954 steps at this file's
                                        # local_batch/grad_accum/block_size on 1 GPU (scales down with
                                        # world_size, since tokens_seen already accounts for it)

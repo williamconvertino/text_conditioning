@@ -10,7 +10,10 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%j.out
 
-# Final conditioning evaluation for the "meco" run (outputs/meco_medium).
+# Final conditioning evaluation for the "meco" run (outputs/checkpoints/meco_p0.9_medium,
+# trained by slurm/experiments/train_meco.slurm). Set RUN_DIR via --export to
+# evaluate another run instead, e.g. the original p_condition=1.0 MeCo run:
+#   sbatch --export=ALL,RUN_DIR=outputs/checkpoints/meco_medium slurm/experiments/eval_meco.slurm
 # Run with: sbatch slurm/experiments/eval_meco.slurm
 
 set -euo pipefail
@@ -33,4 +36,6 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-python scripts/evaluate.py --run-dir "outputs/meco_medium" --mode final
+RUN_DIR=${RUN_DIR:-outputs/checkpoints/meco_p0.9_medium}
+
+python scripts/evaluate.py --run-dir "$RUN_DIR" --mode final

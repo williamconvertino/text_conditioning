@@ -5,7 +5,7 @@
 # conditioning signal at before committing a full compute budget.
 #
 # `model_size` is not read by the model itself -- scripts/train.py appends it
-# to the run's output directory name (outputs/<experiment>_<model_size>) so
+# to the run's output directory name (outputs/checkpoints/<experiment>_<model_size>) so
 # that switching an experiment's `include:` to a different model config (e.g.
 # llama3_3b.yaml) starts a fresh run dir instead of overwriting/resuming this
 # one's checkpoints and logs.

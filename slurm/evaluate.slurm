@@ -30,6 +30,6 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-RUN_DIR=${RUN_DIR:?"set RUN_DIR (e.g. sbatch --export=RUN_DIR=outputs/text_conditioned slurm/evaluate.slurm)"}
+RUN_DIR=${RUN_DIR:?"set RUN_DIR (e.g. sbatch --export=RUN_DIR=outputs/checkpoints/text_conditioned_medium slurm/evaluate.slurm)"}
 
 python scripts/evaluate.py --run-dir "${RUN_DIR}" --mode final

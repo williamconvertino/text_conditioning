@@ -35,4 +35,4 @@ export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B l
 
 torchrun --standalone --nproc_per_node=4 scripts/train.py \
   --experiment "configs/experiment/text_conditioned_param_matched.yaml" \
-  --out-dir outputs
+  --out-dir outputs/checkpoints

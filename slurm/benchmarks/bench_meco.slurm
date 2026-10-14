@@ -11,12 +11,16 @@
 #SBATCH --output=logs/%x-%A_%a.out
 #SBATCH --array=0-5
 
-# lm-eval-harness benchmarking for the "meco" run (outputs/meco_medium): its
+# lm-eval-harness benchmarking for the "meco" run (outputs/checkpoints/meco_p0.9_medium): its
 # unconditioned mode, plus MeCo-conditioned on every named source in
 # configs/benchmarks/sources.yaml (wikipedia/reddit/stackexchange/news/github).
 # One array task per (mode, source) combination -- each runs as its own SLURM
 # job on its own GPU rather than looping sequentially in one job.
 # Run with: sbatch slurm/benchmarks/bench_meco.slurm
+#
+# Set RUN_DIR via --export to benchmark another run instead, e.g. the original
+# p_condition=1.0 MeCo run:
+#   sbatch --export=ALL,RUN_DIR=outputs/checkpoints/meco_medium slurm/benchmarks/bench_meco.slurm
 #
 # Set LIMIT (docs/task) via --export for a fast smoke test before committing
 # to a full run, e.g.:
@@ -42,7 +46,7 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-RUN_DIR=outputs/meco_medium
+RUN_DIR=${RUN_DIR:-outputs/checkpoints/meco_p0.9_medium}
 
 # SLURM_ARRAY_TASK_ID -> (--mode, --source): unconditioned, then every named
 # source in configs/benchmarks/sources.yaml, MeCo-conditioned.

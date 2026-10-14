@@ -1,0 +1,23 @@
+# Closed-book SciQ: lm-eval's sciq without the support passage it prepends
+# (that passage states the answer, which makes the stock task reading
+# comprehension). Tests recall of science facts. Loaded via
+# src/benchmarks/tasks.py's TaskManager include_path.
+task: sciq_closed
+dataset_path: allenai/sciq
+dataset_name: null
+output_type: multiple_choice
+training_split: train
+validation_split: validation
+test_split: test
+doc_to_text: "Question: {{question}}\nAnswer:"
+doc_to_target: 3
+doc_to_choice: "{{[distractor1, distractor2, distractor3, correct_answer]}}"
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: acc_norm
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0

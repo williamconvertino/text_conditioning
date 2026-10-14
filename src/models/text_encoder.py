@@ -11,6 +11,7 @@ configs/model/text_encoder.yaml.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from transformers import PretrainedConfig, PreTrainedModel
 
 from src.models.modeling_llama import RMSNorm, SwiGLU, build_rope_cache, apply_rope, repeat_kv
@@ -52,6 +53,13 @@ class TextEncoderConfig(PretrainedConfig):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
 
 
+# Never cuDNN attention: it builds an execution plan per input shape, and the
+# encoder's shape (inputs x length) changes every batch, so on H200 that
+# planning cost ~65ms of CPU per layer per batch (packed URL-encoded 1.5B
+# training ran ~20% slower than the baseline because of it).
+ENCODER_SDPA_BACKENDS = [SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH]
+
+
 class BidirectionalAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -72,7 +80,8 @@ class BidirectionalAttention(nn.Module):
         q, k = apply_rope(q, k, cos, sin)
         k = repeat_kv(k, self.n_rep)
         v = repeat_kv(v, self.n_rep)
-        out = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, is_causal=False)
+        with sdpa_kernel(ENCODER_SDPA_BACKENDS):
+            out = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, is_causal=False)
         out = out.transpose(1, 2).contiguous().view(B, T, -1)
         return self.o_proj(out)
 

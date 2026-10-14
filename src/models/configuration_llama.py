@@ -28,6 +28,7 @@ class LlamaConfig(PretrainedConfig):
         pad_token_id=None,
         bos_token_id=128000,
         eos_token_id=128001,
+        pinned_condition=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -40,6 +41,10 @@ class LlamaConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
         self.rope_theta = rope_theta
         self.initializer_range = initializer_range
+        # "strong" conditioning (src/models/modeling_llama.py's DecoderLayer):
+        # the conditioning position's hidden state is reset to the
+        # conditioning vector before every attention and MLP sublayer
+        self.pinned_condition = pinned_condition
         super().__init__(
             pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings, **kwargs)

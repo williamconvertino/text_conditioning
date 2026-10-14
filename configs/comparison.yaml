@@ -1,0 +1,16 @@
+# The run set every URL-encoder analysis / steering experiment compares
+# (src/comparison/checkpoints.py, README "Encoder Analysis & Steering").
+#
+# Each run is evaluated at the furthest checkpoint *all* of them share, so no
+# run gets extra training. Every script resolves that checkpoint itself at
+# startup (check it with `python scripts/comparison/show_checkpoint.py`), and
+# stores its results under the checkpoint's label (e.g. step20000), in
+# outputs/{experiments,results}/<model_size>/ (src/utils/paths.py).
+#
+# Optional: `checkpoint: tok<N>M` / `step<N>` pins the checkpoint instead
+# (configs/comparison_3b.yaml).
+model_size: medium
+runs:
+  baseline: outputs/checkpoints/baseline_medium
+  meco: outputs/checkpoints/meco_p0.9_medium
+  url: outputs/checkpoints/text_conditioned_url_full_medium

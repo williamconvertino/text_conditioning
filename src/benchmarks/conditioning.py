@@ -2,7 +2,7 @@
 (scripts/benchmarks/run_benchmarks.py's --mode/--source/--domain/--url) into a
 `ConditioningSpec` that src/benchmarks/lm_wrapper.py's CtrlTokensLM knows how
 to apply, plus a stable `tag` used to organize results
-(src/benchmarks/results.py: outputs/<run>/benchmarks/<tag>/results.json).
+(src/benchmarks/results.py: outputs/experiments/<size>/benchmarks/<run>/<tag>/results.json).
 
 Three conditioning kinds, matching the three ConditionedLM variants
 (src/models/conditioned_lm.py):
@@ -14,6 +14,13 @@ Three conditioning kinds, matching the three ConditionedLM variants
   * "text": a conditioning vector z. Either a named --source (averaged over
     n_docs_per_source matching training documents) or an ad hoc --url (a
     single specific training document).
+
+    For a URL-encoded text run (text_conditioning_source: url,
+    src/data/url_conditioning.py) z is instead the encoder applied to URL
+    metadata -- steering MeCo-style, but in vector space (resolve_url_text):
+    --source encodes the source's meco_domain (the exact string MeCo
+    prepends), --domain encodes any ad hoc string, --url encodes that URL's
+    metadata (it need not appear in the training data).
 """
 
 import re
@@ -22,6 +29,7 @@ import torch
 
 from src.benchmarks.sources import find_doc_by_url, find_source_docs, meco_domain_for_source
 from src.data.collator import collate_encoder_batch, doc_dict
+from src.eval.domain_support import encode_condition_lists
 
 
 def _slug(s, max_len=40):
@@ -83,4 +91,38 @@ def resolve_text(conditioner, tokenizer, tok_dir, train_stems, encoder_max_token
 
     meta = {"source": source, "url": url, "n_docs": len(docs),
             "doc_urls": [shard.url[row] for shard, row in docs]}
+    return ConditioningSpec("text", tag, z=z, meta=meta)
+
+
+@torch.no_grad()
+def resolve_url_text(conditioner, tokenizer, url_source, device, source=None, domain=None, url=None,
+                     sources_cfg=None):
+    """Conditioning vector for a URL-encoded text run: E(metadata string).
+    Tags match resolve_text's / resolve_meco's naming (text_<source>,
+    text_domain-<slug>, text_url-<slug>) so results line up with the other
+    runs' in scripts/benchmarks/plot_benchmarks.py and the benchmark table."""
+    assert sum(x is not None for x in (source, domain, url)) == 1, \
+        "pass exactly one of --source/--domain/--url"
+    if source is not None:
+        meco_domain = meco_domain_for_source(source, sources_cfg)
+        text = meco_domain if url_source.field == "domain" else f"https://{meco_domain}/"
+        tag = f"text_{source}"
+    elif domain is not None:
+        text = domain
+        tag = f"text_domain-{_slug(domain)}"
+    else:
+        text = url_source.metadata_text(url)
+        if text is None:
+            raise ValueError(f"--url {url!r} has no parseable domain")
+        tag = f"text_url-{_slug(url)}"
+
+    was_training = conditioner.training
+    conditioner.eval()
+    try:
+        z = encode_condition_lists(conditioner, tokenizer, [url_source.for_text(text)],
+                                   url_source.encoder_max_tokens, device)[0]
+    finally:
+        conditioner.train(was_training)
+    meta = {"source": source, "domain": domain, "url": url, "encoded": text,
+            "url_field": url_source.field}
     return ConditioningSpec("text", tag, z=z, meta=meta)

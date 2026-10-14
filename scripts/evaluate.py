@@ -7,7 +7,8 @@ check that doesn't touch the encoder-heavy modes.
 
 Final mode (--mode final, the default): the full README "Final Conditioning
 Evaluation" -- none / self / same_domain / domain_mean (/ cross_domain) -- run
-once on the final checkpoint and saved to <run-dir>/final_conditioning.json.
+once on the final checkpoint and saved to
+outputs/experiments/<size>/eval/<run>/final_conditioning.json (src/utils/paths.py).
 Each mode is reported at two scopes (src/eval/conditioning.py): "overall" (the
 fixed, domain-independent validation sample) and "top_domains" (a fixed set of
 domains with enough validation documents to support same-domain/domain-mean
@@ -18,13 +19,12 @@ Given several runs' final_conditioning.json (via --table), also builds the
 comparison table (README "Final Evaluation Table") as csv/md/tex, plus a
 per-domain breakdown CSV.
 
-Usage (run dirs are named <experiment>_<model_size>, e.g. outputs/baseline_medium
--- see scripts/train.py):
-  python scripts/evaluate.py --run-dir outputs/baseline_medium
-  python scripts/evaluate.py --run-dir outputs/meco_medium
-  python scripts/evaluate.py --run-dir outputs/text_conditioned_medium
-  python scripts/evaluate.py --table outputs/baseline_medium outputs/meco_medium \\
-      outputs/text_conditioned_medium --table-out outputs/tables
+Usage (run dirs are named <experiment>_<model_size>, e.g.
+outputs/checkpoints/baseline_medium -- see scripts/train.py):
+  python scripts/evaluate.py --run-dir outputs/checkpoints/baseline_medium
+  python scripts/evaluate.py --run-dir outputs/checkpoints/meco_p0.9_medium
+  python scripts/evaluate.py --table outputs/checkpoints/baseline_medium \\
+      outputs/checkpoints/meco_p0.9_medium   # -> outputs/results/medium/final_eval/tables
 """
 
 import argparse
@@ -42,6 +42,7 @@ from src.eval.conditioning import evaluate_final
 from src.eval.perplexity import evaluate_loss
 from src.training.checkpointing import load_run
 from src.analysis.tables import write_all_tables
+from src.utils.paths import final_conditioning_path, model_size, results_dir
 
 
 def parse_args():
@@ -72,9 +73,16 @@ def evaluate_one(run_dir, args):
     eval_cfg.setdefault("block_size", cfg["block_size"])
     eval_cfg.setdefault("meco_max_tokens", cfg["meco_max_tokens"])
     eval_cfg.setdefault("encoder_max_tokens", cfg.get("encoder_max_tokens", 512))
+    # URL-encoded text runs (src/data/url_conditioning.py) encode URLs, not
+    # document text, in every mode -- src/eval/conditioning.py needs to know.
+    for key in ("text_conditioning_source", "url_conditioning"):
+        if key in cfg:
+            eval_cfg.setdefault(key, cfg[key])
     results = evaluate_final(model, tokenizer, cfg["tok_dir"], val_stems, eval_cfg)
+    results["checkpoint"] = args.checkpoint
 
-    out_path = os.path.join(run_dir, "final_conditioning.json")
+    out_path = final_conditioning_path(run_dir)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"wrote {out_path}")
@@ -109,7 +117,7 @@ def main():
         evaluate_one(args.run_dir, args)
 
     if args.table:
-        table_out = args.table_out or os.path.join(os.path.dirname(args.table[0].rstrip("/")), "tables")
+        table_out = args.table_out or results_dir(model_size(args.table[0]), "final_eval", "tables")
         try:
             _, domain_rows = write_all_tables(args.table, table_out)
         except FileNotFoundError as e:

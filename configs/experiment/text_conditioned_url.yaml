@@ -1,0 +1,23 @@
+# Experiment H -- URL-Encoded Conditioning ("vector-space MeCo"): same
+# architecture as text_conditioned.yaml, but the encoder reads the document's
+# domain string -- byte-for-byte what MeCo prepends as tokens (meco.yaml) --
+# instead of the document text. The LM is conditioned on z = E(domain) in
+# embedding space, so conditioning can later be steered/combined as vectors
+# (README "URL-Encoded Conditioning", src/data/url_conditioning.py).
+#
+# A document with no parseable URL gets the null vector. p_condition 0.9 (not
+# MeCo's 1.0) so the null vector is actually trained and the unconditioned
+# eval is meaningful, as for every other vector-conditioned run.
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: text_conditioned_url
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+text_conditioning_source: url   # self | domain_random | domain_mean | url
+url_conditioning:
+  field: domain       # domain (= MeCo's metadata) | url (full URL, path included)
+  max_tokens: 48      # encoder input cap for the metadata string (= meco_max_tokens)
+conditioning_schedule:
+  kind: constant
+  p_condition: 0.90

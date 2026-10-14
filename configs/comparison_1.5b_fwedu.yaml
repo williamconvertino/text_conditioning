@@ -1,0 +1,10 @@
+# configs/comparison_1.5b.yaml's run set, trained on FineWeb-Edu
+# (configs/data/fineweb_edu.yaml; DATA=fineweb_edu bash slurm/scale/submit.sh
+# 1.5b <experiment> <hours>). The strong-conditioning URL run
+# (text_conditioned_url_full_strong) is included as url_strong.
+model_size: 1.5b
+runs:
+  baseline: outputs/checkpoints/baseline_fwedu_1.5b
+  meco: outputs/checkpoints/meco_p0.9_fwedu_1.5b
+  url: outputs/checkpoints/text_conditioned_url_full_fwedu_1.5b
+  url_strong: outputs/checkpoints/text_conditioned_url_full_strong_fwedu_1.5b

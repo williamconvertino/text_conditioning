@@ -1,0 +1,23 @@
+# Strong URL-encoded conditioning: text_conditioned_url_full.yaml (the encoder
+# reads the full URL, one conditioning slot per document), but the slot is
+# pinned at every depth -- its hidden state is reset to the conditioning
+# vector z before every attention and MLP sublayer
+# (src/models/modeling_llama.py's DecoderLayer, `strong_conditioning`), so
+# every layer attends to z itself instead of a residual-stream state derived
+# from it, and the conditioning can't wash out deeper in the model. Same
+# parameter count as text_conditioned_url_full; z receives gradient from every
+# layer.
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: text_conditioned_url_full_strong
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+text_conditioning_source: url
+strong_conditioning: true
+url_conditioning:
+  field: url
+  max_tokens: 96
+conditioning_schedule:
+  kind: constant
+  p_condition: 0.90

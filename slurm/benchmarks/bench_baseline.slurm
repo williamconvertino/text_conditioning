@@ -10,7 +10,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%j.out
 
-# lm-eval-harness benchmarking for the "baseline" run (outputs/baseline_medium),
+# lm-eval-harness benchmarking for the "baseline" run (outputs/checkpoints/baseline_medium),
 # under its only applicable conditioning setting (--mode none -- a baseline has
 # nothing to condition on; see README "Conditioning during benchmarking").
 # Run with: sbatch slurm/benchmarks/bench_baseline.slurm
@@ -39,7 +39,7 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-ARGS=(--run-dir outputs/baseline_medium --mode none)
+ARGS=(--run-dir outputs/checkpoints/baseline_medium --mode none)
 [[ -n "${LIMIT:-}" ]] && ARGS+=(--limit "${LIMIT}")
 
 python scripts/benchmarks/run_benchmarks.py "${ARGS[@]}"

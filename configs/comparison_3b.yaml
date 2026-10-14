@@ -1,0 +1,19 @@
+# configs/comparison.yaml's run set at the ~3B scale (configs/scale/3b.yaml,
+# README "Scaling Up"): train them with slurm/scale/submit.sh 3b. Every
+# comparison / steering / fine-tuning script takes --comparison-config
+# configs/comparison_3b.yaml; their results land in
+# outputs/{experiments,results}/3b/ (src/utils/paths.py), apart from the other
+# scales'.
+#
+# The URL run stopped at ~7.6B tokens (2026-10-03) and the baseline at ~9.3B
+# (2026-10-08), so the comparison is pinned to the 7B-token snapshot both
+# have (URL step 6016, baseline step 6026): results are stored under
+# tok7000M. MeCo results at that milestone will line up once it is trained
+# and added back below. Move the pin forward (and rerun) once every run has
+# trained further.
+model_size: 3b
+checkpoint: tok7000M
+runs:
+  url: outputs/checkpoints/text_conditioned_url_full_3b
+  baseline: outputs/checkpoints/baseline_3b
+  # meco: outputs/checkpoints/meco_p0.9_3b          # not trained yet

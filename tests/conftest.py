@@ -1,7 +1,8 @@
 """Shared test fixtures: a tiny, self-contained pretokenized shard directory
 (same .bin/_index.parquet/manifest.json/.done format tokenize_fineweb.py
 writes) and a tiny GPT-2 tokenizer, so tests never need network access or the
-real (gated) Llama tokenizer.
+real (gated) Llama tokenizer. Every test also gets its own outputs/ root
+(src/utils/paths.py) under tmp_path, so nothing writes to the real outputs/.
 """
 
 import json
@@ -23,6 +24,15 @@ TEXTS = [
     "Today I want to talk about my favorite hiking trail in the mountains.",
     "This blog post covers three easy recipes for a quick weeknight dinner.",
 ]
+
+
+@pytest.fixture(autouse=True)
+def isolated_outputs(tmp_path):
+    from src.utils import paths
+    previous = paths.OUTPUTS_DIR
+    paths.set_outputs_dir(tmp_path / "outputs")
+    yield paths.OUTPUTS_DIR
+    paths.set_outputs_dir(previous)
 
 
 @pytest.fixture(scope="session")

@@ -1,0 +1,57 @@
+# Fine-tuning the pretrained runs on the benchmark tasks and tracking accuracy
+# against step (scripts/finetune/run_finetune.py, src/finetune/, README
+# "Fine-Tuning"). One job = one (run, method, task); `--task all` trains one
+# model on every task jointly.
+
+tasks: null                  # null -> configs/benchmarks/tasks.yaml's list
+
+splits:                      # src/steering/task_data.py
+  n_fit: null                # null: all of the task's training data
+  n_select: 500
+  holdout_frac: 0.3          # tasks with no train split: share of eval held out for fit/select
+  seed: 1234
+
+# The conditioning "conditioned" fine-tunes with and "peft" starts from. It is
+# a URL, so MeCo and the URL-encoded run condition on the same metadata they
+# saw in pretraining: MeCo prepends its domain (en.wikipedia.org), a full-URL
+# encoder reads the URL itself, a domain encoder reads the domain. The same
+# string configs/benchmarks/sources.yaml's `wikipedia` source steers with.
+condition:
+  url: https://en.wikipedia.org/
+  per_task: {}               # e.g. {hellaswag: "https://www.wikihow.com/"}
+
+# --method picks one of these; mode is standard | conditioned | peft
+# (src/finetune/model.py). peft init: condition (E(url) for text runs, MeCo's
+# prefix token embeddings otherwise) | null_vector (text runs) | vocab_mean
+# (baseline / MeCo: n_vectors copies of the mean token embedding).
+methods:
+  standard:    {mode: standard}
+  conditioned: {mode: conditioned}
+  peft:        {mode: peft, init: condition}
+  peft_null:   {mode: peft, init: null_vector}               # text runs only
+  peft_1vec:   {mode: peft, init: vocab_mean, n_vectors: 1}  # baseline / MeCo: one vector, like a text run's z
+  conditioned_encoder: {mode: conditioned, train_encoder: true}  # text runs: the encoder trains too
+
+objective: choice_ce         # choice_ce | lm (src/finetune/loop.py)
+
+steps: 500
+batch_docs: 32               # documents per optimizer step (all their choices), across all GPUs
+micro_docs: 8                # documents per forward/backward
+warmup_steps: 25
+min_lr_frac: 0.1             # cosine decay to this fraction of the peak LR
+grad_clip: 1.0
+
+lr: 1.0e-5                   # standard / conditioned (AdamW over the whole LM)
+weight_decay: 0.0
+peft_lr_relative: 0.015      # peft: Adam LR as a fraction of the learned vectors' RMS (src/finetune/loop.py)
+
+eval_every: 25
+curve_eval_docs: 1000        # eval docs scored at every curve point (null: all); the final numbers use all
+eval_batch_seqs: 64          # requests per scoring forward
+eval_dtype: float32          # float32 reproduces the lm-eval benchmark scores
+train_dtype: bfloat16        # autocast for training forwards
+log_every: 5
+
+fsdp: false                  # true under torchrun: shard the model (full fine-tuning at 8B)
+save_model: false            # also write the kept iterate as model.pt (loadable with load_run)
+seed: 1234

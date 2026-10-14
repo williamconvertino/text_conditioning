@@ -45,10 +45,15 @@ export TOKENIZERS_PARALLELISM=false
 # Point --output-dir there instead of ./data/fineweb_tokenized/100BT if you'd
 # rather resume that location than start a fresh cache -- the .bin/_index.parquet
 # format written here is byte-for-byte identical either way.
+#
+# DATASET=fineweb-edu tokenizes data/fineweb_edu_raw into data/fineweb_edu_tokenized
+# (same format; slurm/data/prepare_fineweb_edu.sh chains download -> this -> metadata).
+DATASET=${DATASET:-fineweb}
+SAMPLE=${SAMPLE:-100BT}
 python -m src.data.tokenize_fineweb \
-  --input-dir ./data/fineweb_raw/sample/100BT \
-  --output-dir ./data/fineweb_tokenized/100BT \
+  --input-dir "./data/${DATASET//-/_}_raw/sample/${SAMPLE}" \
+  --output-dir "./data/${DATASET//-/_}_tokenized/${SAMPLE}" \
   --tokenizer meta-llama/Llama-3.2-3B \
   --max-doc-tokens 4096 \
-  --num-workers 16 \
+  --num-workers "${SLURM_ARRAY_TASK_COUNT:-16}" \
   --worker-id "${SLURM_ARRAY_TASK_ID}"

@@ -1,0 +1,29 @@
+# ~8B scale (Llama-3.1-8B architecture). scripts/train.py --scale 8b; runs
+# land in outputs/checkpoints/<experiment>_8b. See configs/scale/1.5b.yaml for what a scale
+# file sets.
+#
+# Data: Chinchilla-optimal would be 20 x 8.03B = 161B tokens, more than the
+# 83.8B the training split holds, so the budget is one full epoch: 4096
+# docs/step ~= 2.33M tokens (Llama 3 8B used ~4M), 36k steps ~= 83.8B tokens.
+#
+# FSDP + activation checkpointing (~128GB of fp32 params + grads + AdamW state
+# -- too much for DDP). Checkpoints: ~32GB per eval snapshot, ~96GB for
+# ckpt_last.pt / ckpt_best.pt (optimizer state included).
+include:
+  - ../model/llama3_8b.yaml
+
+global_batch_docs: 4096
+local_batch: 8
+grad_accum: 64               # informational (= 4096 / (8 GPUs x 8))
+length_bucketing: true
+max_steps: 36000
+lr: 3.0e-4                   # Llama 3 8B's peak LR
+min_lr: 3.0e-5
+warmup_steps: 2000
+val_batch_size: 8
+
+fsdp: true
+gradient_checkpointing: true
+save_best_checkpoint: false  # comparisons use the milestone snapshots
+val_interval: 200
+ckpt_save_interval_tokens: 2000000000

@@ -99,22 +99,22 @@ def build_domain_rows(model_results):
     return rows
 
 
-def write_csv(rows, path):
+def write_csv(header, rows, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    header = ["Model"] + [c for _, _, c in COLUMNS]
     with open(path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(header)
         w.writerows(rows)
 
 
-def write_markdown(rows, path):
-    """Column-padded, right-aligned-numbers markdown table (README "Final
-    Evaluation Table" -- Model left-aligned, Loss columns right-aligned with
-    a ---: separator, all cells padded to line up when viewed as raw text)."""
+def write_markdown(header, rows, path, align_right=None):
+    """Column-padded markdown table (README "Final Evaluation Table" -- first
+    column left-aligned, the rest right-aligned with a ---: separator, all
+    cells padded to line up when viewed as raw text). align_right defaults to
+    every column but the first (e.g. a leading "Model"/"Run" column)."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    header = ["Model"] + [c + " ↓" for _, _, c in COLUMNS]
-    align_right = [False] + [True] * len(COLUMNS)
+    if align_right is None:
+        align_right = [False] + [True] * (len(header) - 1)
     all_rows = [header] + rows
     widths = [max(len(r[i]) for r in all_rows) for i in range(len(header))]
 
@@ -133,10 +133,9 @@ def write_markdown(rows, path):
         f.write("\n".join(lines) + "\n")
 
 
-def write_latex(rows, path):
+def write_latex(header, rows, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    header = ["Model"] + [c for _, _, c in COLUMNS]
-    lines = [r"\begin{tabular}{l" + "r" * len(COLUMNS) + "}", r"\toprule",
+    lines = [r"\begin{tabular}{l" + "r" * (len(header) - 1) + "}", r"\toprule",
              " & ".join(header) + r" \\", r"\midrule"]
     for row in rows:
         lines.append(" & ".join(row) + r" \\")
@@ -151,22 +150,25 @@ def write_all_tables(run_dirs, out_dir):
     run dirs' final_conditioning.json files. Shared by scripts/evaluate.py
     --table and scripts/make_table.py, which differ only in how they arrive
     at `run_dirs` (an explicit list vs. auto-discovery under outputs/)."""
+    from src.utils.paths import final_conditioning_path
     from src.analysis.figures import display_name  # local: tables.py is the
     # lower-level module (figures.py already imports from it); deferred here
     # only to avoid a module-load-order cycle, not a real layering violation.
 
     model_results = {}
     for run_dir in run_dirs:
-        path = os.path.join(run_dir, "final_conditioning.json")
+        path = final_conditioning_path(run_dir)
         if not os.path.exists(path):
             raise FileNotFoundError(f"{path} missing -- run `scripts/evaluate.py --run-dir {run_dir} "
                                      f"--mode final` first")
         model_results[display_name(os.path.basename(run_dir.rstrip("/")))] = load_final_results(path)
 
     rows = build_table_rows(model_results)
-    write_csv(rows, os.path.join(out_dir, "final_conditioning.csv"))
-    write_markdown(rows, os.path.join(out_dir, "final_conditioning.md"))
-    write_latex(rows, os.path.join(out_dir, "final_conditioning.tex"))
+    header = ["Model"] + [c for _, _, c in COLUMNS]
+    write_csv(header, rows, os.path.join(out_dir, "final_conditioning.csv"))
+    write_markdown(["Model"] + [c + " ↓" for _, _, c in COLUMNS], rows,
+                   os.path.join(out_dir, "final_conditioning.md"))
+    write_latex(header, rows, os.path.join(out_dir, "final_conditioning.tex"))
 
     domain_rows = build_domain_rows(model_results)
     if domain_rows:

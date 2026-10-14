@@ -1,0 +1,10 @@
+# configs/comparison.yaml's run set at the ~8B scale (configs/scale/8b.yaml,
+# README "Scaling Up"): train them with slurm/scale/submit.sh 8b. Every
+# comparison / steering / fine-tuning script takes --comparison-config
+# configs/comparison_8b.yaml; their results land in outputs/{experiments,results}/8b/
+# (src/utils/paths.py), apart from the other scales'.
+model_size: 8b
+runs:
+  baseline: outputs/checkpoints/baseline_8b
+  meco: outputs/checkpoints/meco_p0.9_8b
+  url: outputs/checkpoints/text_conditioned_url_full_8b

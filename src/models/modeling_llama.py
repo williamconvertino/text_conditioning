@@ -16,6 +16,11 @@ be deeply embedded throughout the Transformer blocks".
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
+try:
+    from torch.nn.attention.varlen import varlen_attn
+except ImportError:          # torch < 2.9: packed batches fall back to a dense mask
+    varlen_attn = None
 from transformers import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 
@@ -57,6 +62,34 @@ def apply_rope(q, k, cos, sin):
     return q, k
 
 
+def apply_rope_packed(q, k, cos, sin):
+    # q/k: [B, T, H, head_dim]; cos/sin: [B, T, head_dim], already gathered at
+    # each token's within-segment position
+    cos, sin = cos[:, :, None, :], sin[:, :, None, :]
+    return (q * cos) + (rotate_half(q) * sin), (k * cos) + (rotate_half(k) * sin)
+
+
+def segment_causal_mask(cu_seqlens, n):
+    """Dense [n, n] bool mask: causal within each segment of cu_seqlens, nothing
+    across segments. The CPU / no-varlen fallback for packed attention."""
+    idx = torch.arange(n, device=cu_seqlens.device)
+    seg = torch.searchsorted(cu_seqlens[1:].to(torch.long), idx, right=True)
+    return (seg[:, None] == seg[None, :]) & (idx[None, :] <= idx[:, None])
+
+
+def packed_attention(q, k, v, cu_seqlens, max_seqlen):
+    """q: [N, H, D], k/v: [N, H_kv, D] over all packed tokens -> [N, H, D],
+    causal within each segment of cu_seqlens (int32 [S + 1])."""
+    if varlen_attn is not None and q.is_cuda:
+        return varlen_attn(q, k, v, cu_seqlens, cu_seqlens, max_seqlen, max_seqlen,
+                           window_size=(-1, 0), enable_gqa=k.shape[1] != q.shape[1])
+    n_rep = q.shape[1] // k.shape[1]
+    mask = segment_causal_mask(cu_seqlens, q.shape[0])
+    qh, kh, vh = (t.transpose(0, 1).unsqueeze(0) for t in (q, k, v))   # [1, H, N, D]
+    out = F.scaled_dot_product_attention(qh, repeat_kv(kh, n_rep), repeat_kv(vh, n_rep), attn_mask=mask)
+    return out.squeeze(0).transpose(0, 1)
+
+
 def repeat_kv(x, n_rep):
     if n_rep == 1:
         return x
@@ -88,8 +121,17 @@ class CausalSelfAttention(nn.Module):
         self.v_proj = nn.Linear(config.hidden_size, self.num_kv_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, config.hidden_size, bias=False)
 
-    def forward(self, x, cos, sin, attn_mask):
+    def forward(self, x, cos, sin, attn_mask, cu_seqlens=None, max_seqlen=None):
         B, T, _ = x.shape
+        if cu_seqlens is not None:
+            q = self.q_proj(x).view(B, T, self.num_heads, self.head_dim)
+            k = self.k_proj(x).view(B, T, self.num_kv_heads, self.head_dim)
+            v = self.v_proj(x).view(B * T, self.num_kv_heads, self.head_dim)
+            q, k = apply_rope_packed(q, k, cos, sin)
+            out = packed_attention(q.reshape(B * T, self.num_heads, self.head_dim).to(v.dtype),
+                                   k.reshape(B * T, self.num_kv_heads, self.head_dim).to(v.dtype),
+                                   v, cu_seqlens, max_seqlen)
+            return self.o_proj(out.reshape(B, T, -1))
         q = self.q_proj(x).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
         k = self.k_proj(x).view(B, T, self.num_kv_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(x).view(B, T, self.num_kv_heads, self.head_dim).transpose(1, 2)
@@ -109,8 +151,16 @@ class DecoderLayer(nn.Module):
         self.post_attention_layernorm = RMSNorm(config.hidden_size, config.rms_norm_eps)
         self.mlp = SwiGLU(config.hidden_size, config.intermediate_size)
 
-    def forward(self, x, cos, sin, attn_mask):
-        x = x + self.self_attn(self.input_layernorm(x), cos, sin, attn_mask)
+    def forward(self, x, cos, sin, attn_mask, cu_seqlens=None, max_seqlen=None, pin_mask=None, pin_values=None):
+        """pin_mask [B, T, 1] bool / pin_values [B, T, H] ("strong"
+        conditioning): pinned positions are reset to pin_values before each
+        sublayer, so every attention and MLP sees the conditioning vector
+        itself rather than a residual-stream state derived from it."""
+        if pin_mask is not None:
+            x = torch.where(pin_mask, pin_values.to(x.dtype), x)
+        x = x + self.self_attn(self.input_layernorm(x), cos, sin, attn_mask, cu_seqlens, max_seqlen)
+        if pin_mask is not None:
+            x = torch.where(pin_mask, pin_values.to(x.dtype), x)
         x = x + self.mlp(self.post_attention_layernorm(x))
         return x
 
@@ -118,7 +168,7 @@ class DecoderLayer(nn.Module):
 class LlamaPreTrainedModel(PreTrainedModel):
     config_class = LlamaConfig
     base_model_prefix = "model"
-    supports_gradient_checkpointing = False
+    supports_gradient_checkpointing = True
 
     def _init_weights(self, module):
         std = self.config.initializer_range
@@ -140,6 +190,11 @@ class LlamaModel(LlamaPreTrainedModel):
         self.layers = nn.ModuleList([DecoderLayer(config) for _ in range(config.num_hidden_layers)])
         self.norm = RMSNorm(config.hidden_size, config.rms_norm_eps)
         self.head_dim = config.hidden_size // config.num_attention_heads
+        # Recompute each layer's activations in backward instead of storing
+        # them (training only). Set from the run config's gradient_checkpointing
+        # key (src/training/trainer.py's build_model), needed to fit the 3B/8B
+        # configs (configs/scale/).
+        self.gradient_checkpointing = False
         self.post_init()
 
     def get_input_embeddings(self):
@@ -148,15 +203,29 @@ class LlamaModel(LlamaPreTrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
-    def forward(self, input_ids=None, inputs_embeds=None, attention_mask=None):
+    def forward(self, input_ids=None, inputs_embeds=None, attention_mask=None,
+                position_ids=None, cu_seqlens=None, max_seqlen=None, pinned_mask=None):
+        """Packed batches (src/data/packing.py) pass position_ids [B, T]
+        (restarting at 0 in every segment) and cu_seqlens (int32 [S + 1],
+        segment boundaries over the flattened B*T tokens): attention is then
+        causal within each segment only.
+
+        config.pinned_condition ("strong" conditioning, see DecoderLayer):
+        the positions in pinned_mask [B, T] (the conditioning slots) keep
+        their input embedding at every sublayer. Without an explicit
+        pinned_mask, a call with inputs_embeds pins position 0 -- where every
+        unpacked caller puts the conditioning vector (ConditionedLM,
+        benchmarks, fine-tuning, steering); calls with input_ids pin nothing."""
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
         B, T, _ = inputs_embeds.shape
-        cos, sin = build_rope_cache(self.head_dim, T, self.config.rope_theta,
+        cos, sin = build_rope_cache(self.head_dim, max_seqlen or T, self.config.rope_theta,
                                     inputs_embeds.device, inputs_embeds.dtype)
 
         attn_mask = None
-        if attention_mask is not None:
+        if cu_seqlens is not None:
+            cos, sin = cos[position_ids], sin[position_ids]          # [B, T, head_dim]
+        elif attention_mask is not None:
             # additive mask combining the causal triangle with padding, [B, 1, T, T]
             keep_col = attention_mask[:, None, None, :].to(torch.bool)   # [B,1,1,T]
             causal = torch.tril(torch.ones(T, T, device=inputs_embeds.device, dtype=torch.bool))
@@ -164,9 +233,21 @@ class LlamaModel(LlamaPreTrainedModel):
             attn_mask = torch.zeros(B, 1, T, T, device=inputs_embeds.device, dtype=inputs_embeds.dtype)
             attn_mask.masked_fill_(~keep, torch.finfo(inputs_embeds.dtype).min)
 
+        pin_mask = None
+        if getattr(self.config, "pinned_condition", False) and (pinned_mask is not None or
+                                                                (input_ids is None and cu_seqlens is None)):
+            if pinned_mask is None:
+                pinned_mask = torch.zeros(B, T, dtype=torch.bool, device=inputs_embeds.device)
+                pinned_mask[:, 0] = True
+            pin_mask = pinned_mask.unsqueeze(-1)
+
         x = inputs_embeds
+        pin = (pin_mask, inputs_embeds if pin_mask is not None else None)
         for layer in self.layers:
-            x = layer(x, cos, sin, attn_mask)
+            if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
+                x = checkpoint(layer, x, cos, sin, attn_mask, cu_seqlens, max_seqlen, *pin, use_reentrant=False)
+            else:
+                x = layer(x, cos, sin, attn_mask, cu_seqlens, max_seqlen, *pin)
         x = self.norm(x)
         return BaseModelOutputWithPast(last_hidden_state=x)
 
@@ -186,10 +267,21 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
     def set_input_embeddings(self, value):
         self.model.embed_tokens = value
 
-    def forward(self, input_ids=None, inputs_embeds=None, attention_mask=None):
-        out = self.model(input_ids=input_ids, inputs_embeds=inputs_embeds, attention_mask=attention_mask)
+    def forward(self, input_ids=None, inputs_embeds=None, attention_mask=None, **packed):
+        out = self.model(input_ids=input_ids, inputs_embeds=inputs_embeds, attention_mask=attention_mask,
+                         **packed)
         logits = self.lm_head(out.last_hidden_state)
         return CausalLMOutputWithPast(logits=logits)
+
+
+def packed_token_loss(logits, labels):
+    """Mean next-token cross-entropy for a packed batch: labels [B, T] holds
+    the token each position predicts (-100 = no loss; src/data/packing.py
+    already did the shift). Returns (loss, n_tokens)."""
+    flat = labels.reshape(-1)
+    nll = F.cross_entropy(logits.reshape(flat.shape[0], -1).float(), flat, ignore_index=-100, reduction="sum")
+    n_tok = (flat != -100).sum().clamp_min(1)
+    return nll / n_tok, n_tok
 
 
 def shifted_token_loss(logits, target_ids, loss_mask):

@@ -12,7 +12,7 @@
 #SBATCH --array=0-5
 
 # lm-eval-harness benchmarking for the "meco_cooldown" run
-# (outputs/meco_cooldown_medium, conditioning_schedule cooled to p=0 by the end
+# (outputs/checkpoints/meco_cooldown_medium, conditioning_schedule cooled to p=0 by the end
 # of training -- configs/experiment/meco_cooldown.yaml): its unconditioned
 # mode, plus MeCo-conditioned on every named source in
 # configs/benchmarks/sources.yaml. One array task per (mode, source)
@@ -44,7 +44,7 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-RUN_DIR=outputs/meco_cooldown_medium
+RUN_DIR=outputs/checkpoints/meco_cooldown_medium
 
 # SLURM_ARRAY_TASK_ID -> (--mode, --source): unconditioned, then every named
 # source in configs/benchmarks/sources.yaml, MeCo-conditioned.

@@ -12,7 +12,7 @@
 #SBATCH --array=0-5
 
 # lm-eval-harness benchmarking for the "text_conditioned" run
-# (outputs/text_conditioned_medium): its unconditioned (null-vector) mode,
+# (outputs/checkpoints/text_conditioned_medium): its unconditioned (null-vector) mode,
 # plus text-conditioned on every named source in configs/benchmarks/sources.yaml
 # (a domain-mean vector averaged from n_docs_per_source matching training
 # documents -- see README "Conditioning during benchmarking"). One array task
@@ -44,7 +44,7 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-RUN_DIR=outputs/text_conditioned_medium
+RUN_DIR=outputs/checkpoints/text_conditioned_medium
 
 # SLURM_ARRAY_TASK_ID -> (--mode, --source): unconditioned, then every named
 # source in configs/benchmarks/sources.yaml, text-conditioned.

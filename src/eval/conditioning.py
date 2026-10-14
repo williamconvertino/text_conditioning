@@ -19,6 +19,18 @@ measurement"):
                      (there's nothing to average).
   text:              all of none / self / same_domain / domain_mean, plus the
                      optional cheap cross_domain sanity check.
+  text, URL-encoded  (text_conditioning_source: url, src/data/url_conditioning.py)
+                     the encoder only ever sees URL metadata, so every mode
+                     encodes URLs rather than document text: "self" = the
+                     document's own URL (MeCo's "self", in vector space),
+                     same_domain = another same-domain document's URL,
+                     domain_mean = the mean over the support documents' URLs,
+                     cross_domain = another domain's mean. With field
+                     "domain" (the default), every same-domain document's
+                     metadata is the identical domain string, so same_domain
+                     and domain_mean would just repeat "self" and are left
+                     as None (same reasoning as MeCo); cross_domain is kept
+                     -- it's the "steer to the wrong domain" test.
 
 Two evaluation scopes, per mode (README "output results for each domain
 considered as well as some aggregation"):
@@ -45,8 +57,9 @@ import torch
 
 from src.data.collator import collate_batch, doc_dict
 from src.data.shards import iter_shard_docs
+from src.data.url_conditioning import build_url_source
 from src.eval.domain_support import (
-    build_domain_index, encode_single_doc, encode_support_vectors,
+    build_domain_index, encode_condition_lists, encode_single_doc, encode_support_vectors,
     split_support_and_eval, top_domains,
 )
 
@@ -129,7 +142,8 @@ def _drop_n_tok(scored):
 
 def evaluate_final(model, tokenizer, tok_dir, val_stems, cfg):
     """cfg: configs/eval/conditioning.yaml, merged with the run's block_size /
-    meco_max_tokens / encoder_max_tokens (see scripts/evaluate.py). Returns:
+    meco_max_tokens / encoder_max_tokens / variant / text_conditioning_source /
+    url_conditioning (see scripts/evaluate.py). Returns:
 
         {"overall": {mode: (loss, ppl) or None, ...},
          "top_domains": None, or {
@@ -150,10 +164,21 @@ def evaluate_final(model, tokenizer, tok_dir, val_stems, cfg):
         return _score(model, docs, tokenizer, variant_for_batch, block_size, meco_max_tokens,
                      encoder_max_tokens, batch_size, **kwargs)
 
+    url_source = build_url_source({**cfg, "variant": variant}, tokenizer)
+
+    def url_z(docs):
+        """Each doc's own URL encoding (null vector without a parseable URL)."""
+        return encode_condition_lists(model.conditioner, tokenizer,
+                                      [url_source.for_url(d["url"]) for d in docs],
+                                      url_source.encoder_max_tokens, device)
+
     # -- "overall": the fixed val_docs-sized sample, independent of domain --
     all_docs = [doc_dict(sh, r) for sh, r in iter_shard_docs(tok_dir, val_stems, limit=cfg.get("val_docs"))]
     overall = _empty_modes()
-    if variant == "none":
+    if url_source is not None:
+        overall["none"] = _drop_n_tok(score(all_docs, "text", keep_mask_value=False))
+        overall["self"] = _drop_n_tok(score(all_docs, "text", z_provider=url_z))
+    elif variant == "none":
         overall["none"] = _drop_n_tok(score(all_docs, "none"))
     elif variant == "meco":
         overall["none"] = _drop_n_tok(score(all_docs, "none"))
@@ -180,7 +205,15 @@ def evaluate_final(model, tokenizer, tok_dir, val_stems, cfg):
                                                 only_domains=domain_names)
 
     domain_means = None
-    if variant == "text":
+    if url_source is not None:
+        # one input list per domain holding every support doc's URL -> its mean
+        domain_names_ = list(support)
+        zs = encode_condition_lists(
+            model.conditioner, tokenizer,
+            [[x for sh, r in support[d] for x in url_source.for_url(sh.url[r])] for d in domain_names_],
+            url_source.encoder_max_tokens, device)
+        domain_means = dict(zip(domain_names_, zs))
+    elif variant == "text":
         domain_means = encode_support_vectors(model.conditioner, tokenizer, support,
                                               encoder_max_tokens, device)
     rng = random.Random(seed)
@@ -193,7 +226,23 @@ def evaluate_final(model, tokenizer, tok_dir, val_stems, cfg):
             continue
         result = _empty_modes()
 
-        if variant == "none":
+        if url_source is not None:
+            result["none"] = score(docs, "text", keep_mask_value=False)
+            result["self"] = score(docs, "text", z_provider=url_z)
+            z_mean = domain_means[domain].unsqueeze(0).to(device)
+            if url_source.field == "url":
+                support_docs = [doc_dict(sh, r) for sh, r in support[domain]]
+                result["same_domain"] = score(
+                    docs, "text", z_provider=lambda chunk: url_z([rng.choice(support_docs) for _ in chunk]))
+                result["domain_mean"] = score(
+                    docs, "text", z_provider=lambda chunk: z_mean.expand(len(chunk), -1))
+            other_domains = [d for d in domain_means if d != domain]
+            if cfg.get("cross_domain", False) and other_domains:
+                result["cross_domain"] = score(
+                    docs, "text",
+                    z_provider=lambda chunk: torch.stack(
+                        [domain_means[rng.choice(other_domains)] for _ in chunk], dim=0).to(device))
+        elif variant == "none":
             result["none"] = score(docs, "none")
         elif variant == "meco":
             result["none"] = score(docs, "none")

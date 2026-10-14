@@ -1,0 +1,20 @@
+# Experiment H'' -- Full-URL Encoded Conditioning: text_conditioned_url.yaml,
+# but the encoder reads the full URL (path included) rather than just the
+# domain. Richer metadata than MeCo uses -- URL paths often spell out the page
+# title, so this sits between domain-level conditioning and self-conditioning
+# on the text (README "URL-Encoded Conditioning"). Unlike the domain field,
+# same-domain documents now have distinct conditioning inputs, so the final
+# eval also reports Same-Domain / Domain-Mean for this run.
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: text_conditioned_url_full
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+text_conditioning_source: url
+url_conditioning:
+  field: url
+  max_tokens: 96      # full URLs run longer than domains
+conditioning_schedule:
+  kind: constant
+  p_condition: 0.90

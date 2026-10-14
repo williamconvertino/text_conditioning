@@ -1,0 +1,42 @@
+# Steering experiment 2: task-optimized conditioning (scripts/steering/run_task_vectors.py,
+# README "Encoder Analysis & Steering"). For each benchmark task (and "all" jointly),
+# search for the conditioning that maximizes accuracy on the task's training data,
+# select on held-out data, and report on lm-eval's eval split.
+#
+# Methods (which ones run depends on the run's variant):
+#   unconditioned     every run            null vector / no prefix / baseline
+#   source:<name>     meco, url            each named source (configs/benchmarks/sources.yaml)
+#   domain_search     meco, url            best single domain among `candidates` on select
+#   opt_simplex       url                  best convex mix of library domain vectors
+#   opt_free          url                  unconstrained vector, initialized at `free.init`
+
+tasks: null                 # null -> configs/benchmarks/tasks.yaml's list
+
+splits:                     # src/steering/task_data.py
+  n_fit: 2000
+  n_select: 500
+  holdout_frac: 0.3         # tasks with no train split: share of eval docs held out
+  seed: 1234
+
+domain_search:
+  n_candidates: 100         # most frequent library domains (+ the named sources' domains)
+
+simplex:
+  n_library: 256            # most frequent library domains, + the null vector
+  vector: centroid          # centroid | root (src/url_analysis/encode.py)
+  steps: 300
+  lr: 0.1
+  batch_docs: 16
+  eval_every: 25
+
+free:
+  init: domain_search       # domain_search (its winner) | mean (library mean) | null
+  steps: 300
+  lr: 0.02                  # Adam step, per coordinate (page vectors have ~1.4 RMS per coordinate)
+  batch_docs: 16
+  eval_every: 25
+  l2: 0.0                   # penalty on ||delta||^2 / ||init||^2
+  max_norm_mult: 1.5        # cap ||z|| at this multiple of the largest library centroid norm
+
+nearest_k: 15               # nearest library domains reported per learned vector
+eval_batch_size: 16          # as configs/benchmarks/tasks.yaml (fp32 full-vocab log-softmax is memory hungry)

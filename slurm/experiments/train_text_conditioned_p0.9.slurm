@@ -14,7 +14,7 @@
 # with a constant conditioning_schedule of p_condition=0.9 (see
 # src/training/schedules.py). --p-condition tags the run dir so this doesn't
 # collide with the yaml's own default (p_condition=0.90) run --
-# see outputs/text_conditioned_p0.9_medium.
+# see outputs/checkpoints/text_conditioned_p0.9_medium.
 # Run with: sbatch slurm/experiments/train_text_conditioned_p0.9.slurm
 
 set -euo pipefail
@@ -40,4 +40,4 @@ export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B l
 torchrun --standalone --nproc_per_node=4 scripts/train.py \
   --experiment "configs/experiment/text_conditioned.yaml" \
   --p-condition 0.9 \
-  --out-dir outputs
+  --out-dir outputs/checkpoints

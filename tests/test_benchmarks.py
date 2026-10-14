@@ -202,7 +202,7 @@ def test_save_and_discover_results(tmp_path):
     loaded = load_result(path)
     assert loaded["results"]["hellaswag"]["acc,none"] == 0.42
 
-    records = discover_results(str(tmp_path))
+    records = discover_results()
     assert len(records) == 1
     assert records[0]["run_name"] == "baseline_medium"
 

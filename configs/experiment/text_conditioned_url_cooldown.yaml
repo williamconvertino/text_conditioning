@@ -1,0 +1,22 @@
+# Experiment H' -- URL-Encoded Conditioning with MeCo's cooldown schedule:
+# text_conditioned_url.yaml, but with meco_cooldown.yaml's exact schedule
+# (conditioned 100% of the time for the first 70% of training, then linearly
+# cooled to 0% by the end), so the pair MeCo (Cooldown) vs. this run differs
+# only in how the same domain string reaches the LM: prefix tokens vs. an
+# encoded vector (README "URL-Encoded Conditioning").
+include:
+  - ../model/llama_medium.yaml
+  - ../train/default.yaml
+name: text_conditioned_url_cooldown
+variant: text
+text_encoder_config: ../model/text_encoder.yaml
+text_conditioning_source: url
+url_conditioning:
+  field: domain
+  max_tokens: 48
+conditioning_schedule:
+  kind: linear_cooldown
+  p_start: 1.0
+  p_end: 0.0
+  cooldown_start_frac: 0.7
+  cooldown_end_frac: 1.0

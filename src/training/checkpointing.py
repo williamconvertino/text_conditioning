@@ -6,15 +6,24 @@ import torch
 from transformers import AutoTokenizer
 
 
-def save_checkpoint(path, model, optimizer, step, best_val, tokens_seen, run_cfg):
+def _state(obj):
+    """A module/optimizer's state_dict, or an already-built state dict (an
+    FSDP run gathers full state dicts itself, src/utils/sharding.py)."""
+    return obj.state_dict() if hasattr(obj, "state_dict") else obj
+
+
+def save_checkpoint(path, model, optimizer, step, best_val, tokens_seen, run_cfg, extra=None):
+    """model / optimizer: the modules themselves, or their (full) state dicts.
+    extra: more top-level entries (e.g. a packed run's per-rank data_cursor)."""
     tmp = path + ".tmp"
     torch.save({
-        "model": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
+        "model": _state(model),
+        "optimizer": _state(optimizer),
         "step": step,
         "best_val": best_val,
         "tokens_seen": tokens_seen,
         "run_cfg": run_cfg,
+        **(extra or {}),
     }, tmp)
     os.replace(tmp, path)
 
@@ -35,7 +44,7 @@ def save_eval_checkpoint(path, model, step, best_val, tokens_seen, run_cfg):
     ~3x an AdamW optimizer state would add."""
     tmp = path + ".tmp"
     torch.save({
-        "model": model.state_dict(),
+        "model": _state(model),
         "step": step,
         "best_val": best_val,
         "tokens_seen": tokens_seen,
@@ -63,7 +72,9 @@ def load_run(run_dir, checkpoint="ckpt_best.pt", device=None):
     model, _ = build_model(cfg, tokenizer)
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    ckpt = torch.load(os.path.join(run_dir, checkpoint), map_location=device)
+    # mmap: tensors are paged in as they're copied into the model, instead of
+    # holding a second full copy of the weights (~32GB for the 8B config).
+    ckpt = torch.load(os.path.join(run_dir, checkpoint), map_location="cpu", mmap=True)
     model.load_state_dict(ckpt["model"])
     model.eval()
     return model, tokenizer, cfg

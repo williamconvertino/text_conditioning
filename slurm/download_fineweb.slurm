@@ -31,4 +31,8 @@ export HF_TOKEN=${HF_TOKEN:-}
 
 # Resumable: snapshot_download skips files it already has, so a re-run after a
 # timeout/preemption just picks up where it left off.
-python -m src.data.download_fineweb --sample 100BT --out-dir ./data/fineweb_raw
+#   sbatch slurm/download_fineweb.slurm                                   # FineWeb -> data/fineweb_raw
+#   sbatch --export=ALL,DATASET=fineweb-edu slurm/download_fineweb.slurm  # FineWeb-Edu -> data/fineweb_edu_raw
+DATASET=${DATASET:-fineweb}
+python -m src.data.download_fineweb --dataset "$DATASET" --sample "${SAMPLE:-100BT}" \
+  --out-dir "./data/${DATASET//-/_}_raw"

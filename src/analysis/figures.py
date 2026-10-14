@@ -18,6 +18,7 @@ from matplotlib.ticker import FuncFormatter
 
 from src.analysis.curves import load_run_config, load_run_metrics, smooth
 from src.analysis.tables import DOMAIN_MODE_LABELS, load_final_results
+from src.utils.paths import final_conditioning_path
 
 DISPLAY_NAMES = {
     "baseline": "Baseline",
@@ -26,13 +27,23 @@ DISPLAY_NAMES = {
     "text_conditioned": "Text Conditioning",
     "text_conditioned_param_matched": "Text Conditioning (Param Matched)",
     "text_conditioned_cooldown": "Text Conditioning (Cooldown)",
+    "text_conditioned_domain_mean": "Text Conditioning (Domain-Mean)",
+    "text_conditioned_domain_random": "Text Conditioning (Same-Domain)",
+    "text_conditioned_url": "URL-Encoded Conditioning",
+    "text_conditioned_url_cooldown": "URL-Encoded Conditioning (Cooldown)",
+    "text_conditioned_url_full": "URL-Encoded Conditioning (Full URL)",
+    "text_conditioned_url_full_strong": "URL-Encoded Conditioning (Full URL, Strong)",
 }
+# configs/data/*.yaml corpora other than the default FineWeb, by `dataset`
+DATASET_LABELS = {"fineweb_edu": "FineWeb-Edu"}
+# their run-dir tags (scripts/train.py appends _<run_tag> before _<model_size>)
+DATA_RUN_TAGS = ("fwedu",)
 
 # Run dirs are named <experiment>_<model_size> (scripts/train.py), e.g.
-# outputs/baseline_medium -- strip a known model_size suffix before looking up
+# outputs/checkpoints/baseline_medium -- strip a known model_size suffix before looking up
 # DISPLAY_NAMES, then note the size, so plots/tables stay readable regardless
 # of which model_size an experiment was trained at.
-MODEL_SIZES = ("small", "medium", "full")
+MODEL_SIZES = ("small", "medium", "full", "1.5b", "3b", "8b")
 
 # Column-name prefix (before "_ppl"/"_loss"), legend label, and per-run
 # conditioning-curve figure stem (plot_conditioning_curve below) for each
@@ -41,13 +52,28 @@ MODEL_SIZES = ("small", "medium", "full")
 # text summary. Both support a conditioning_schedule (src/training/
 # schedules.py); the figure stem is shared across every text_conditioned*
 # family (pre-existing "text_conditioning_*" filenames), one per this dict's
-# distinct family key otherwise.
+# distinct family key otherwise. The domain-conditioned families' conditioned
+# column is the condition they're trained under (in-domain partner documents,
+# README "Domain-Conditioned Training"); they also log self_conditioned_*,
+# which plot_conditioning_curve adds as a third line. The URL-encoded
+# families' conditioned column is the encoded-URL condition (README
+# "URL-Encoded Conditioning"); they never see document text, so have no
+# self-conditioned column.
 CONDITIONED_PREFIXES = {
     "meco": ("meco_conditioned", "MeCo-conditioned", "meco_conditioning"),
     "meco_cooldown": ("meco_conditioned", "MeCo-conditioned", "meco_conditioning"),
     "text_conditioned": ("self_conditioned", "self-conditioned", "text_conditioning"),
     "text_conditioned_param_matched": ("self_conditioned", "self-conditioned", "text_conditioning"),
     "text_conditioned_cooldown": ("self_conditioned", "self-conditioned", "text_conditioning"),
+    "text_conditioned_domain_mean": ("domain_conditioned", "domain-mean-conditioned",
+                                     "text_domain_mean_conditioning"),
+    "text_conditioned_domain_random": ("domain_conditioned", "same-domain-conditioned",
+                                       "text_domain_random_conditioning"),
+    "text_conditioned_url": ("url_conditioned", "URL-conditioned", "text_url_conditioning"),
+    "text_conditioned_url_cooldown": ("url_conditioned", "URL-conditioned",
+                                      "text_url_cooldown_conditioning"),
+    "text_conditioned_url_full": ("url_conditioned", "full-URL-conditioned",
+                                  "text_url_full_conditioning"),
 }
 
 # Fixed y-axis caps used by every loss/ppl figure -- well above the converged
@@ -91,15 +117,27 @@ BASE_COLORS = {
     "text_conditioned": "#D55E00",
     "text_conditioned_param_matched": "#009E73",
     "text_conditioned_cooldown": "#CC79A7",
+    "text_conditioned_domain_mean": "#E69F00",
+    "text_conditioned_domain_random": "#882255",
+    # URL-encoded = vector-space MeCo: indigo, dark/light like meco/meco_cooldown
+    "text_conditioned_url": "#332288",
+    "text_conditioned_url_cooldown": "#8878D0",
+    "text_conditioned_url_full": "#44AA99",
+    "text_conditioned_url_full_strong": "#117733",
 }
 _FALLBACK_PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9"]
 
 
 def base_name(run_name):
-    """Strip a trailing _<model_size> suffix, e.g. "meco_medium" -> "meco"."""
+    """Strip a trailing _<model_size> suffix, then a data tag, e.g.
+    "meco_medium" -> "meco", "baseline_fwedu_1.5b" -> "baseline"."""
     for size in MODEL_SIZES:
         if run_name.endswith(f"_{size}"):
-            return run_name[: -(len(size) + 1)]
+            run_name = run_name[: -(len(size) + 1)]
+            break
+    for tag in DATA_RUN_TAGS:
+        if run_name.endswith(f"_{tag}"):
+            return run_name[: -(len(tag) + 1)]
     return run_name
 
 
@@ -167,8 +205,10 @@ def display_name(run_name, cfg=None):
     else:
         base = base_name(run_name)
         label = DISPLAY_NAMES.get(base, run_name)
-        size = run_name[len(base) + 1:]
+        size = run_name.rsplit("_", 1)[-1]
     extras = [size] if size in MODEL_SIZES else []
+    if cfg and cfg.get("dataset") in DATASET_LABELS:
+        extras.append(DATASET_LABELS[cfg["dataset"]])
     sched = schedule_label(cfg)
     if sched:
         extras.append(sched)
@@ -343,23 +383,34 @@ def plot_validation_unconditioned_loss(run_dirs, out_dir, ymax=LOSS_YMAX):
     plot_validation_unconditioned(run_dirs, out_dir, metric="loss", ymax=ymax)
 
 
-def plot_validation_conditioned(run_dirs, out_dir, metric="ppl", ymax=None):
+def plot_validation_conditioned(run_dirs, out_dir, metric="ppl", ymax=None, include_baseline=True):
     """Conditioned validation loss/perplexity across runs -- the
     conditioned-only counterpart to plot_validation_unconditioned above,
     using each run's experiment-family conditioned column (CONDITIONED_PREFIXES:
     self_conditioned_* for text conditioning, meco_conditioned_* for MeCo).
-    Runs from a family with no conditioned column at all (e.g. the baseline,
-    which has nothing to condition on) are silently skipped rather than
-    plotted as empty/flat lines."""
+    The baseline, which has nothing to condition on, is drawn as a dashed,
+    "(unconditioned)"-labeled reference line from its ordinary validation
+    curve (include_baseline=False leaves it out); other runs from a family
+    with no conditioned column are skipped rather than plotted as flat lines."""
     with plt.style.context(STYLE):
         fig, ax = plt.subplots()
         plotted = []
         for d in _resolve_runs(run_dirs):
             prefix, _, _ = CONDITIONED_PREFIXES.get(d["base"], (None, None, None))
-            if prefix is None:
-                continue
             df = load_run_metrics(d["run_dir"])
             va = df[df["split"] == "val"]
+            if prefix is None:
+                if not (include_baseline and d["base"] == "baseline") or metric not in va.columns:
+                    continue
+                v = va.dropna(subset=[metric])
+                if v.empty:
+                    continue
+                ax.plot(v["tokens"], v[metric], linestyle="--", marker="o", markersize=4,
+                        markeredgecolor="white", color=d["color"],
+                        label=(d["label"][:-1] + ", unconditioned)" if d["label"].endswith(")")
+                               else f"{d['label']} (unconditioned)"))
+                plotted.append((v["tokens"], v[metric]))
+                continue
             col = f"{prefix}_{metric}"
             if col not in va.columns:
                 continue
@@ -380,12 +431,12 @@ def plot_validation_conditioned(run_dirs, out_dir, metric="ppl", ymax=None):
         save_figure(fig, out_dir, f"validation_conditioned_{metric}")
 
 
-def plot_validation_conditioned_ppl(run_dirs, out_dir, ymax=PPL_YMAX):
-    plot_validation_conditioned(run_dirs, out_dir, metric="ppl", ymax=ymax)
+def plot_validation_conditioned_ppl(run_dirs, out_dir, ymax=PPL_YMAX, include_baseline=True):
+    plot_validation_conditioned(run_dirs, out_dir, metric="ppl", ymax=ymax, include_baseline=include_baseline)
 
 
-def plot_validation_conditioned_loss(run_dirs, out_dir, ymax=LOSS_YMAX):
-    plot_validation_conditioned(run_dirs, out_dir, metric="loss", ymax=ymax)
+def plot_validation_conditioned_loss(run_dirs, out_dir, ymax=LOSS_YMAX, include_baseline=True):
+    plot_validation_conditioned(run_dirs, out_dir, metric="loss", ymax=ymax, include_baseline=include_baseline)
 
 
 def plot_conditioning_curve(run_dir, out_dir, metric="ppl", ymax=None):
@@ -416,11 +467,20 @@ def plot_conditioning_curve(run_dir, out_dir, metric="ppl", ymax=None):
                  marker="o", markersize=4, markeredgecolor="white", label="Unconditioned")
         ax.plot(va["tokens"], va[cond_col], color=color, linestyle="--",
                  marker="^", markersize=4, markeredgecolor="white",
-                 label=cond_label.capitalize())
+                 label=cond_label[:1].upper() + cond_label[1:])
+        plotted = [(va["tokens"], va[uncond_col]), (va["tokens"], va[cond_col])]
+        # Domain-conditioned runs also log self-conditioning (the encoder
+        # seeing the target document itself), which they never train on.
+        self_col = f"self_conditioned_{metric}"
+        if prefix != "self_conditioned" and self_col in va.columns and va[self_col].notna().any():
+            sc = va.dropna(subset=[self_col])
+            ax.plot(sc["tokens"], sc[self_col], color=color, linestyle=":",
+                     marker="s", markersize=3.5, markeredgecolor="white", label="Self-conditioned")
+            plotted.append((sc["tokens"], sc[self_col]))
         ax.set_ylabel(f"Validation {_metric_label(metric).lower()}")
         ax.set_title(display_name(name, cfg))
         if ymax is not None:
-            _crop_to_cap(ax, [(va["tokens"], va[uncond_col]), (va["tokens"], va[cond_col])], ymax)
+            _crop_to_cap(ax, plotted, ymax)
         _format_token_axis(ax)
         ax.legend()
         save_figure(fig, out_dir, f"{stem}_{metric}")
@@ -510,7 +570,7 @@ def plot_final_conditioning(run_dirs, out_dir, metric="ppl"):
     idx = 1 if metric == "ppl" else 0
     bars = []
     for d in _resolve_runs(run_dirs):
-        path = os.path.join(d["run_dir"], "final_conditioning.json")
+        path = final_conditioning_path(d["run_dir"])
         if not os.path.exists(path):
             continue
         top_domains = load_final_results(path).get("top_domains")

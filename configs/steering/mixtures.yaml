@@ -1,0 +1,48 @@
+# Steering experiment 1: combining URL vectors (scripts/steering/run_mixtures.py,
+# README "Encoder Analysis & Steering"). Every vector below is evaluated on the
+# full lm-eval suite (configs/benchmarks/tasks.yaml) with the URL-encoded run at
+# the shared checkpoint.
+
+run: url
+
+# Named anchors. The five benchmark sources use the exact strings
+# run_benchmarks.py --mode text --source encodes (https://<meco_domain>/), so
+# alpha = 0 / 1 reproduce the comparison table's text_<source> rows.
+anchors:
+  wikipedia: https://en.wikipedia.org/
+  stackexchange: https://stackoverflow.com/
+  reddit: https://reddit.com/
+  news: https://nytimes.com/
+  github: https://github.com/
+  4chan: https://boards.4chan.org/          # rare/absent in FineWeb: encoder extrapolates
+  foxnews: https://www.foxnews.com/
+  fanfiction: https://www.fanfiction.net/
+  simple_wikipedia: https://simple.wikipedia.org/
+  khanacademy: https://www.khanacademy.org/
+
+# input: encode the anchor string (default); centroid: mean of the domain's
+# page vectors from the URL-encoder analysis library (needs
+# outputs/experiments/<size>/url_analysis/<label>/library.pt)
+anchor_vector: input
+
+pairs:
+  - [wikipedia, stackexchange]
+  - [reddit, 4chan]
+  - [wikipedia, reddit]
+  - [news, foxnews]
+  - [wikipedia, fanfiction]
+  - [stackexchange, github]
+  - [wikipedia, simple_wikipedia]
+alphas: [0.0, 0.25, 0.5, 0.75, 1.0]
+interpolation: linear        # linear | slerp
+
+# steering strength: z_ref + s * (z_anchor - z_ref); s = 1 is the anchor
+scale:
+  anchors: [wikipedia, reddit, stackexchange]
+  reference: mean            # mean (library mean of domain centroids) | null
+  strengths: [0.0, 0.5, 1.0, 1.5, 2.0, 3.0]
+
+# equal-weight averages of several anchors
+means:
+  all_sources: [wikipedia, stackexchange, reddit, news, github]
+  reference_qa: [wikipedia, stackexchange, khanacademy]

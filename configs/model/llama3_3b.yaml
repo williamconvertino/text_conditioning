@@ -1,10 +1,13 @@
-# The README's named target architecture, close to Llama-3.2-3B. Not used by any
-# default experiment config in this repo (see llama_medium.yaml for why); point
-# an experiment's `include:` at this file instead once you're ready to scale up
-# to the full size -- doing so automatically moves that experiment's runs to a
-# new outputs/<experiment>_full directory (see model_size below), so nothing
-# from the medium-scale runs gets overwritten.
-model_size: full
+# Llama-3.2-3B architecture (meta-llama/Llama-3.2-3B config.json), the
+# README's named target: 28 layers, d_model 3072, SwiGLU 8192, 24 query / 8 KV
+# heads (head_dim 128), RoPE theta 500k, tied input/output embeddings,
+# 128,256-token vocab. ~3.21B params (2.82B non-embedding).
+#
+# max_position_embeddings is this repo's block_size + 1 (the conditioning
+# position) instead of 131072, and there is no "llama3" RoPE scaling (it only
+# matters beyond the original 8K context).
+# Used via configs/scale/3b.yaml; runs land in outputs/checkpoints/<experiment>_3b.
+model_size: 3b
 hidden_size: 3072
 intermediate_size: 8192
 num_hidden_layers: 28
@@ -14,4 +17,4 @@ max_position_embeddings: 2049
 rms_norm_eps: 1.0e-5
 rope_theta: 500000.0
 initializer_range: 0.02
-tie_word_embeddings: false
+tie_word_embeddings: true

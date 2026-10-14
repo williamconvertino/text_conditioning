@@ -1,4 +1,6 @@
-# Default lm-evaluation-harness benchmark suite
+# Default lm-evaluation-harness benchmark suite. sciq_closed / mmlu_cont are
+# this repo's own task definitions (configs/benchmarks/lm_eval_tasks/, loaded by
+# src/benchmarks/tasks.py); the rest are lm-eval built-ins.
 # (scripts/benchmarks/run_benchmarks.py / src/benchmarks/lm_wrapper.py).
 #
 # Every task here is loglikelihood-only multiple-choice/binary accuracy: no
@@ -18,7 +20,8 @@ tasks:
   - winogrande
   - boolq
   - openbookqa
-  - lambada_openai
+  - sciq_closed   # configs/benchmarks/lm_eval_tasks/: closed-book SciQ (no support passage)
+  - mmlu_cont     # configs/benchmarks/lm_eval_tasks/: MMLU, all subjects, continuation scoring
 
 num_fewshot: 0
 batch_size: 16

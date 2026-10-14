@@ -12,7 +12,7 @@
 #SBATCH --array=0-5
 
 # lm-eval-harness benchmarking for the "text_conditioned_param_matched" run
-# (outputs/text_conditioned_param_matched_medium, backbone shrunk so
+# (outputs/checkpoints/text_conditioned_param_matched_medium, backbone shrunk so
 # backbone+encoder params ~= baseline -- configs/experiment/
 # text_conditioned_param_matched.yaml): its unconditioned (null-vector) mode,
 # plus text-conditioned on every named source in configs/benchmarks/sources.yaml.
@@ -44,7 +44,7 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-RUN_DIR=outputs/text_conditioned_param_matched_medium
+RUN_DIR=outputs/checkpoints/text_conditioned_param_matched_medium
 
 # SLURM_ARRAY_TASK_ID -> (--mode, --source): unconditioned, then every named
 # source in configs/benchmarks/sources.yaml, text-conditioned.

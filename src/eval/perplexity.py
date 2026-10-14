@@ -16,6 +16,14 @@ def evaluate_loss(model, batches, keep_mask_value=None):
 
     Returns (loss, perplexity).
     """
+    tot_loss, tot_tok = evaluate_loss_sums(model, batches, keep_mask_value)
+    loss = tot_loss / max(1, tot_tok)
+    return loss, math.exp(min(loss, 20.0))
+
+
+def evaluate_loss_sums(model, batches, keep_mask_value=None):
+    """evaluate_loss's (summed NLL, token count), so a caller can split the
+    batches across ranks and add the parts up."""
     was_training = model.training
     model.eval()
     device = next(model.parameters()).device
@@ -31,5 +39,4 @@ def evaluate_loss(model, batches, keep_mask_value=None):
             tot_tok += n_tok.item()
     if was_training:
         model.train()
-    loss = tot_loss / max(1, tot_tok)
-    return loss, math.exp(min(loss, 20.0))
+    return tot_loss, tot_tok

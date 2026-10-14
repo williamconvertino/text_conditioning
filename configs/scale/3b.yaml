@@ -1,0 +1,33 @@
+# ~3B scale (Llama-3.2-3B architecture). scripts/train.py --scale 3b; runs
+# land in outputs/checkpoints/<experiment>_3b. See configs/scale/1.5b.yaml for what a scale
+# file sets.
+#
+# Data: Chinchilla-optimal, 20 x 3.21B = 64.3B tokens: 2048 docs/step ~= 1.16M
+# tokens, 55.3k steps. Runs are trained one at a time for as long as the
+# budget allows and compared at matching 1B-token milestones.
+#
+# Parallelism, measured on H200s (slurm/scale/check_3b_parallelism.slurm,
+# real tokens/s per GPU, length-bucketed): DDP without activation
+# checkpointing at a 4 x 2048-token micro-batch is fastest -- 13.0k tok/s,
+# 115 GiB peak (the worst-case micro-batch; ~52GB of it is params + grads +
+# AdamW state). DDP + checkpointing at 8 x 2048: 9.7k tok/s, 92 GiB. FSDP +
+# checkpointing: 8.8k tok/s, 58 GiB. 8 x 2048 without checkpointing OOMs.
+# Padding every document to 2048 instead of bucketing: 4.1k tok/s.
+# At 13.0k tok/s x 8 GPUs, ~21B tokens (~18k steps) per 60h.
+include:
+  - ../model/llama3_3b.yaml
+
+global_batch_docs: 2048
+local_batch: 4               # micro-batch token budget: 4 x 2048 = 8K tokens
+grad_accum: 64               # informational (= 2048 / (8 GPUs x 4))
+length_bucketing: true
+max_steps: 55250
+lr: 3.0e-4
+min_lr: 3.0e-5
+warmup_steps: 2000
+
+fsdp: false
+gradient_checkpointing: false
+val_interval: 500            # also the ckpt_last.pt cadence (~1.5h); jobs also save at their deadline
+save_best_checkpoint: false  # comparisons use the milestone snapshots; saves a ~51GB write per validation
+ckpt_save_interval_tokens: 1000000000   # a 13GB eval snapshot every 1B tokens

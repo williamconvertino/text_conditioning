@@ -38,4 +38,4 @@ EXPERIMENT=${EXPERIMENT:?"set EXPERIMENT (e.g. sbatch --export=EXPERIMENT=baseli
 
 torchrun --standalone --nproc_per_node=4 scripts/train.py \
   --experiment "configs/experiment/${EXPERIMENT}.yaml" \
-  --out-dir outputs
+  --out-dir outputs/checkpoints

@@ -10,7 +10,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%j.out
 
-# Final conditioning evaluation for the "text_conditioned_cooldown" run (outputs/text_conditioned_cooldown_medium).
+# Final conditioning evaluation for the "text_conditioned_cooldown" run (outputs/checkpoints/text_conditioned_cooldown_medium).
 # Run with: sbatch slurm/experiments/eval_text_conditioned_cooldown.slurm
 
 set -euo pipefail
@@ -33,4 +33,4 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-python scripts/evaluate.py --run-dir "outputs/text_conditioned_cooldown_medium" --mode final
+python scripts/evaluate.py --run-dir "outputs/checkpoints/text_conditioned_cooldown_medium" --mode final

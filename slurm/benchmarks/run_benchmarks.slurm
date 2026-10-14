@@ -13,13 +13,13 @@
 # lm-eval-harness benchmarking for one (run, conditioning) combination
 # (scripts/benchmarks/run_benchmarks.py). Pass args via sbatch --export, e.g.:
 #
-#   sbatch --export=RUN_DIR=outputs/baseline_medium,MODE=none \
+#   sbatch --export=RUN_DIR=outputs/checkpoints/baseline_medium,MODE=none \
 #       slurm/benchmarks/run_benchmarks.slurm
 #
-#   sbatch --export=RUN_DIR=outputs/meco_medium,MODE=meco,SOURCE=wikipedia \
+#   sbatch --export=RUN_DIR=outputs/checkpoints/meco_medium,MODE=meco,SOURCE=wikipedia \
 #       slurm/benchmarks/run_benchmarks.slurm
 #
-#   sbatch --export=RUN_DIR=outputs/text_conditioned_medium,MODE=text,SOURCE=reddit \
+#   sbatch --export=RUN_DIR=outputs/checkpoints/text_conditioned_medium,MODE=text,SOURCE=reddit \
 #       slurm/benchmarks/run_benchmarks.slurm
 #
 # DOMAIN / URL / TAG / LIMIT are optional and map to the matching --flag.
@@ -44,7 +44,7 @@ fi
 export HF_HOME=/work/wac20/.cache/huggingface
 export HF_TOKEN=${HF_TOKEN:?"set HF_TOKEN in .env (needs accepted Llama-3.2-3B license)"}
 
-RUN_DIR=${RUN_DIR:?"set RUN_DIR (e.g. sbatch --export=RUN_DIR=outputs/baseline_medium,MODE=none slurm/benchmarks/run_benchmarks.slurm)"}
+RUN_DIR=${RUN_DIR:?"set RUN_DIR (e.g. sbatch --export=RUN_DIR=outputs/checkpoints/baseline_medium,MODE=none slurm/benchmarks/run_benchmarks.slurm)"}
 MODE=${MODE:?"set MODE (none | meco | text)"}
 
 ARGS=(--run-dir "${RUN_DIR}" --mode "${MODE}")

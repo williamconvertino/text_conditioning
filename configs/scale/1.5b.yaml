@@ -1,0 +1,38 @@
+# 1.5B scale, following the pretraining recipe of "Beyond URLs" (Fan et al.,
+# 2025, arXiv:2511.21613) / "URLs Help, Topics Guide": 1.5B Llama, sequence
+# length 4096, ~2.1M tokens per step, AdamW (weight decay 0.1), cosine LR
+# 3e-4 -> 3e-5 with 2000 warmup steps, 100B tokens. Applied on top of an
+# experiment config by scripts/train.py --scale 1.5b; runs land in
+# outputs/checkpoints/<experiment>_1.5b (README "Scaling Up").
+#
+# Packed sequences (src/data/packing.py): documents are concatenated into
+# 4096-token rows, attention restricted to each document, MeCo's prefix /
+# the URL encoder's slot at every document start. 512 rows x 4096 = 2.10M
+# tokens per step (the papers: 504 x 4096 = 2.06M; 512 divides evenly over
+# 8 GPUs), 47,684 steps = 100.0B tokens (~1.1 epochs of the 91.2B-token
+# FineWeb 100BT sample). tokens_seen counts row positions, so every variant
+# is at the same token count at the same step.
+#
+# DDP (~24GB of fp32 params + grads + AdamW state per GPU), compiled decoder
+# layers, no activation checkpointing.
+include:
+  - ../model/llama3_1.5b.yaml
+
+block_size: 4096
+packing: true
+global_batch_seqs: 512       # rows per optimizer step, whatever the GPU count
+local_batch: 8               # rows per micro-batch (32K tokens)
+grad_accum: 8                # informational: re-derived from global_batch_seqs (= 512 / (8 GPUs x 8))
+compile: true
+max_steps: 47684
+lr: 3.0e-4
+min_lr: 3.0e-5
+warmup_steps: 2000
+weight_decay: 0.1
+
+val_batch_size: 8
+fsdp: false
+gradient_checkpointing: false
+save_best_checkpoint: false  # comparisons use the milestone snapshots
+val_interval: 500            # also the ckpt_last.pt cadence (~1B tokens)
+ckpt_save_interval_tokens: 2000000000   # a 6GB eval snapshot every 2B tokens

@@ -1,0 +1,11 @@
+# configs/comparison.yaml's run set at the 1.5B scale (configs/scale/1.5b.yaml,
+# README "Scaling Up"): train them with slurm/scale/submit.sh 1.5b. Every
+# comparison / steering / fine-tuning script takes --comparison-config
+# configs/comparison_1.5b.yaml; their results land in
+# outputs/{experiments,results}/1.5b/ (src/utils/paths.py), apart from the
+# other scales'.
+model_size: 1.5b
+runs:
+  baseline: outputs/checkpoints/baseline_1.5b
+  meco: outputs/checkpoints/meco_p0.9_1.5b
+  url: outputs/checkpoints/text_conditioned_url_full_1.5b

@@ -1,0 +1,85 @@
+# URL-encoder latent-space analysis (scripts/url_analysis/run_encoder_analysis.py,
+# README "Encoder Analysis & Steering"). The encoder analyzed is the `run` entry
+# of configs/comparison.yaml at the furthest checkpoint all compared runs share.
+run: url
+
+corpus:
+  n_shards: 8              # training shards scanned for URLs (~1M URLs each)
+  seed: 1234
+
+library:                   # the domain "library" (also used by the steering experiments)
+  n_domains: 5000          # most frequent domains in the scanned shards
+  pages_per_domain: 32     # page URLs encoded per domain (their mean = the domain centroid)
+
+neighbors:
+  k: 15
+  n_top_domains: 60        # also list neighbors for the 60 most frequent domains
+  # domains to report nearest neighbors for and to highlight on the maps
+  queries:
+    - en.wikipedia.org
+    - simple.wikipedia.org
+    - reddit.com
+    - stackoverflow.com
+    - math.stackexchange.com
+    - github.com
+    - nytimes.com
+    - foxnews.com
+    - theguardian.com
+    - bbc.co.uk
+    - fanfiction.net
+    - imdb.com
+    - tripadvisor.com
+    - ideas.repec.org
+    - urbandictionary.com
+    - bleacherreport.com
+    - medium.com
+    - abovetopsecret.com
+    - freerepublic.com
+    - chroniclingamerica.loc.gov
+  # arbitrary encoder inputs (need not be library domains, or even appear in
+  # training) to place relative to the library
+  extra_inputs:
+    4chan: https://boards.4chan.org/
+    arxiv: https://arxiv.org/
+    pubmed: https://pubmed.ncbi.nlm.nih.gov/
+    wikipedia_article: https://en.wikipedia.org/wiki/Quantum_mechanics
+    reddit_askscience: https://www.reddit.com/r/askscience/
+    fake_news_site: https://www.totally-real-news-daily.com/
+
+map:
+  n_domains: 2000
+  n_label: 45              # most frequent domains labeled on the maps (plus the queries)
+  n_clusters: 24
+  tsne_perplexity: 30
+  # ordered substring rules -> category used to color the maps (first match wins)
+  categories:
+    reference: [wikipedia, wiki, dictionary, encyclopedia, britannica, reference.com, thefreedictionary]
+    q&a / forum: [stackexchange, stackoverflow, reddit, forum, answers, board, community, discuss, quora]
+    blog: [blog, wordpress, tumblr, medium.com, hubpages, livejournal, typepad]
+    academic / gov: [.edu, .gov, .ac., repec, ncbi, arxiv, loc.gov, scholar, springer, sciencedirect]
+    news: [news, times, post, herald, tribune, journal, gazette, daily, cnn, bbc, reuters, guardian, telegraph, bloomberg, politico, npr]
+    shopping / deals: [shop, store, amazon, ebay, etsy, deal, groupon, coupon, bargain]
+    sports: [sport, espn, nfl, nba, mlb, bleacherreport, football, soccer]
+    entertainment: [imdb, movie, film, music, variety, tv, game, ign, fanfiction, celeb]
+    business / finance: [finance, money, fool.com, marketwatch, thestreet, forbes, business, prweb, prnewswire, invest]
+
+in_domain:
+  pages: 3000              # page URLs sampled per group
+  n_clusters: 8
+  top_labels: 10           # most frequent labels colored per rule; the rest are plotted gray as "other"
+  # group name -> domain suffixes it covers, and the URL label rules to test
+  # (src/url_analysis/analyses.py's label_url: subdomain | section | year |
+  # path:<i> | path_after:<segment>)
+  groups:
+    wikipedia: {domains: [en.wikipedia.org], rules: []}
+    reddit: {domains: [reddit.com], rules: ["path_after:r"]}
+    stackexchange: {domains: [stackexchange.com], rules: [subdomain]}
+    nytimes: {domains: [nytimes.com], rules: [section, year]}
+    theguardian: {domains: [theguardian.com], rules: [section, year]}
+    github: {domains: [github.com], rules: ["path:0"]}
+    blogspot: {domains: [blogspot.com], rules: [subdomain, year]}
+
+perturbations:
+  n_urls: 200              # random library pages whose surface-edited variants are encoded
+
+seed: 0
